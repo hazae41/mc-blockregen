@@ -1,0 +1,21 @@
+name: BlockRegenerator-Reloaded
+version: 1.0
+main: fr.rhaz.minecraft.blockregenerator.BlockRegeneratorPlugin
+author: WolfMage1
+softdepend: [WorldGuard]
+
+commands:
+    blockregen:
+        description: "Base command for BlockRegenerator."
+        usage: "\u00a7cCorrect Usage: /<command> <forceregen|disableregen|clearblocks>"
+        permission: blockregen.command.blockregen
+        permission-message: "\u00a7cYou don't have permission to perform this command."
+
+permissions:
+    blockregen.*:
+        children:
+            blockregen.command.blockregen: true
+            blockregen.action.forceregen: true
+            blockregen.action.disableregen: true
+            blockregen.action.clearblocks: true
+            blockregen.action.rd: true
