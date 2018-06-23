@@ -13,6 +13,9 @@ import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
+import org.bukkit.event.block.BlockBurnEvent
+import org.bukkit.event.block.BlockPlaceEvent
+import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.io.File
@@ -21,13 +24,6 @@ import java.lang.Byte.parseByte
 import java.util.LinkedList
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
-import kotlin.collections.forEach
-import kotlin.collections.isEmpty
-import kotlin.collections.listOf
-import kotlin.collections.toMutableList
-import org.bukkit.Bukkit.getWorlds
-import org.bukkit.event.block.BlockBurnEvent
-import org.bukkit.event.entity.EntityExplodeEvent
 
 
 class BlockRegeneratorPlugin: JavaPlugin(), Listener{
@@ -332,6 +328,7 @@ object BlockRegenerator{
     fun creative(creative: Boolean) = config?.set("creative-regen-ignored", creative);
 
     var listener = object: Listener{
+
         @EventHandler
         fun onBlockBreak(e: BlockBreakEvent) {
 
@@ -384,6 +381,28 @@ object BlockRegenerator{
                     continue;
                 brokenBlocks.add(block.state);
             }
+        }
+
+        @EventHandler
+        fun onBlockPlace(e: BlockPlaceEvent) {
+
+            if (creative())
+                if(e.player.gameMode == GameMode.CREATIVE)
+                    return
+
+            val config = BlockRegenerator.config ?: return debug("Config is null");
+
+            if (!config.getBoolean("destroy-placed"))
+                return;
+            if(!protected(e.block))
+                return;
+            if(!worlds.contains(e.block.world.name))
+                return;
+            if(excluded(e.block))
+                return;
+            if(paused())
+                return;
+            placedBlocks.add(e.block.state);
         }
     }
 }
