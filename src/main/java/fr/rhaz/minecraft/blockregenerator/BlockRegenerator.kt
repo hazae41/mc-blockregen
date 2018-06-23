@@ -11,7 +11,12 @@ import java.io.File
 import java.io.IOException
 import java.awt.SystemColor.info
 import com.sun.deploy.util.GeneralUtil.getStringList
+import org.bukkit.ChatColor
+import org.bukkit.command.CommandExecutor
 import java.lang.Byte.parseByte
+import org.bukkit.block.BlockState
+import org.bukkit.scheduler.BukkitRunnable
+
 
 
 
@@ -25,11 +30,42 @@ object BlockRegenerator{
     fun init(): Boolean = plugin != null;
     fun init(plugin: BlockRegeneratorPlugin) {
         this.plugin = plugin;
-        config = loadConfig("config.yml");
+
+        val config = loadConfig("config.yml")
+            ?: return info("Could not load config");
+
         loadWorlds();
         loadWorldGuard();
         if(worldGuard()) loadRegions();
+        loadExcludedMaterials();
+
+        timer.runTaskTimer(plugin, 0L,config.getLong("regen-delay") * 20L * 60L);
+        plugin.getCommand("regen").setExecutor { sender, command, s, args ->
+            if (args.size < 1)
+                false;
+            val lowerCase = args[0].toLowerCase();
+            when(lowerCase){
+                "forceregen" -> {
+                    if (!sender.hasPermission("blockregen.action.forceregen"))
+                        true.also { sender.sendMessage(ChatColor.RED +
+                            "You don't have permission to do that.")
+                        }
+
+                    sender.sendMessage(ChatColor.GREEN + "Forcing block regeneration...");
+                    timer.run();
+                    sender.sendMessage(ChatColor.GREEN + "Regeneration Complete!");
+                    true;
+                }
+            }
+            false;
+        };
     }
+
+    var brokenBlocks = ArrayList<BlockState>();
+    var placedBlocks = ArrayList<BlockState>();
+
+    var timer = Timer();
+    fun isPaused(): Boolean = config?.getBoolean("paused") ?: false;
 
     var debugging = true;
     fun debug(debug: String) {
@@ -42,11 +78,13 @@ object BlockRegenerator{
     fun info(msg: String) = plugin?.logger?.info(msg) ?: Unit;
 
     var config: YamlConfiguration? = null;
-    fun loadConfig(name: String): YamlConfiguration {
-        if (!plugin!!.dataFolder.exists()) plugin!!.dataFolder.mkdir();
-        val file = File(plugin!!.dataFolder, name);
-        if (!file.exists()) plugin!!.saveResource(name, false);
-        return YamlConfiguration.loadConfiguration(file);
+    fun loadConfig(name: String): YamlConfiguration? {
+        val plugin = this.plugin ?: return null;
+        if (!plugin.dataFolder.exists()) plugin.dataFolder.mkdir();
+        val file = File(plugin.dataFolder, name);
+        if (!file.exists()) plugin.saveResource(name, false);
+        config = YamlConfiguration.loadConfiguration(file);
+        return config;
     }
     fun saveConfig(config: YamlConfiguration, name: String) {
         try {
@@ -154,3 +192,55 @@ object BlockRegenerator{
         }
     }
 }
+
+class Timer : BukkitRunnable() {
+
+    override fun run() {
+
+        val plugin = BlockRegenerator;
+
+        val config = plugin.config
+                ?: return BlockRegenerator.info("Config is null");
+
+        if (!plugin.isPaused()) {
+
+            val max = config.getInt("max-blocks");
+            var current: Int;
+
+            val placed = plugin.placedBlocks.toMutableList();
+            val broken = plugin.brokenBlocks.toMutableList();
+
+            plugin.debug("Performing block regeneration.");
+            val startTime = System.currentTimeMillis();
+
+            current = 0;
+            for(state in placed) {
+                state.location.block.type = Material.AIR;
+                plugin.placedBlocks.removeAt(current);
+                if(current++ >= max) break;
+            }
+
+            current = 0;
+            for (state in broken) {
+
+                plugin.debug(
+                    "MATERIAL: ${state.type}," +
+                    "DATA: ${state.data}, " +
+                    "X: ${state.x}, " +
+                    "Y: ${state.y}, " +
+                    "Z: ${state.z}, " +
+                    "WORLD: ${state.world.name}"
+                )
+
+                state.location.block.type = state.type
+                state.location.block.data = state.data.data
+                plugin.brokenBlocks.removeAt(current);
+                if(current++ > max) break;
+            }
+
+            val endTime = System.currentTimeMillis()
+            plugin.debug("Regeneration complete, took " + (startTime - endTime) + "ms.")
+        }
+    }
+}
+
