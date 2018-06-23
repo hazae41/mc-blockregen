@@ -1,4 +1,4 @@
-name: BlockRegenerator-Reloaded
+name: BlockRegenerator
 version: 1.0
 main: fr.rhaz.minecraft.blockregenerator.BlockRegeneratorPlugin
 author: WolfMage1

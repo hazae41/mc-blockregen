@@ -46,7 +46,7 @@ object BlockRegenerator{
         loadExcludedMaterials();
 
         timer.runTaskTimer(plugin, 0L,config.getLong("regen-delay") * 20L * 60L);
-        plugin.getCommand("regen").let {
+        plugin.getCommand("blockregen").let {
             it.setExecutor {
                 sender, command, s, args ->
                 if(args.isEmpty()) true.not();
