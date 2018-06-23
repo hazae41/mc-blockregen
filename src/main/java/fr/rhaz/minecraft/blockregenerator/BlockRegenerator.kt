@@ -2,23 +2,19 @@ package fr.rhaz.minecraft.blockregenerator
 
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import org.bukkit.Bukkit
+import org.bukkit.ChatColor
 import org.bukkit.Material
 import org.bukkit.block.Block
+import org.bukkit.block.BlockState
+import org.bukkit.command.Command
+import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.event.Listener
 import org.bukkit.plugin.java.JavaPlugin
+import org.bukkit.scheduler.BukkitRunnable
 import java.io.File
 import java.io.IOException
-import java.awt.SystemColor.info
-import com.sun.deploy.util.GeneralUtil.getStringList
-import org.bukkit.ChatColor
-import org.bukkit.command.CommandExecutor
 import java.lang.Byte.parseByte
-import org.bukkit.block.BlockState
-import org.bukkit.scheduler.BukkitRunnable
-
-
-
 
 class BlockRegeneratorPlugin: JavaPlugin(), Listener{
     override fun onEnable() = BlockRegenerator.init(this);
@@ -40,32 +36,86 @@ object BlockRegenerator{
         loadExcludedMaterials();
 
         timer.runTaskTimer(plugin, 0L,config.getLong("regen-delay") * 20L * 60L);
-        plugin.getCommand("regen").setExecutor { sender, command, s, args ->
-            if (args.size < 1)
-                false;
-            val lowerCase = args[0].toLowerCase();
-            when(lowerCase){
-                "forceregen" -> {
-                    if (!sender.hasPermission("blockregen.action.forceregen"))
-                        true.also { sender.sendMessage(ChatColor.RED +
-                            "You don't have permission to do that.")
-                        }
+        plugin.getCommand("regen").let {
+            it.setExecutor {
+                sender, command, s, args ->
+                if(args.isEmpty()) false;
+                val lowerCase = args[0].toLowerCase();
+                when(lowerCase){
+                    "forceregen", "fr" -> true.also{
 
-                    sender.sendMessage(ChatColor.GREEN + "Forcing block regeneration...");
-                    timer.run();
-                    sender.sendMessage(ChatColor.GREEN + "Regeneration Complete!");
-                    true;
+                        if (!sender.hasPermission("blockregen.action.forceregen"))
+                            return@also sender.sendMessage("${ChatColor.RED}" +
+                            "You don't have permission to do that." )
+
+                        sender.sendMessage("${ChatColor.GREEN}" +
+                            "Forcing block regeneration...");
+                        timer.run();
+                        sender.sendMessage("${ChatColor.GREEN}" +
+                            "Regeneration Complete!");
+
+                    }
+                    "disableregen", "dr" -> true.also{
+
+                        if (!sender.hasPermission("blockregen.action.disableregen"))
+                            return@also sender.sendMessage("${ChatColor.RED}" +
+                            "You don't have permission to do that." )
+
+                        val paused = paused();
+                        paused(!paused);
+
+                        if(!paused) sender.sendMessage("${ChatColor.GREEN}" +
+                            "Block regeneration enabled.");
+                        else sender.sendMessage("${ChatColor.GREEN}" +
+                            "Block regeneration disabled.");
+
+                    }
+                    "clearblocks", "cb" -> true.also {
+
+                        if (!sender.hasPermission("blockregen.action.clearblocks"))
+                            return@also sender.sendMessage("${ChatColor.RED}" +
+                            "You don't have permission to do that.");
+
+                        info("Blocks forcibly cleared by ${sender.name}");
+
+                        "${placedBlocks.size + brokenBlocks.size} blocks lost. " +
+                        "(${placedBlocks.size} placed, ${brokenBlocks.size} broken)"
+                            .let { info(it); sender.sendMessage(it) };
+
+                        listOf(placedBlocks, brokenBlocks).forEach{it.clear()};
+
+                    }
+                    "rd" -> true.also {
+
+                        if (!sender.hasPermission("blockregen.action.rd"))
+                            return@also sender.sendMessage("${ChatColor.RED}" +
+                            "You don't have permission to do that.");
+
+                        debugging = !debugging;
+
+                        if (debugging) sender.sendMessage("${ChatColor.GREEN}" +
+                            "Runtime debugging enabled.");
+                        else sender.sendMessage("${ChatColor.RED}" +
+                            "Runtime debugging disabled.");
+
+                    }
+                    else -> false;
                 }
             }
-            false;
+            it.setTabCompleter {
+                _, _, _, _ ->
+                listOf("forceregen", "disableregen", "clearblocks", "rd");
+            }
         };
+        debug("BlockRegenerator has been Enabled.!");
     }
 
     var brokenBlocks = ArrayList<BlockState>();
     var placedBlocks = ArrayList<BlockState>();
 
     var timer = Timer();
-    fun isPaused(): Boolean = config?.getBoolean("paused") ?: false;
+    fun paused(): Boolean = config?.getBoolean("paused") ?: false;
+    fun paused(paused: Boolean) = config?.set("paused", paused);
 
     var debugging = true;
     fun debug(debug: String) {
@@ -202,7 +252,7 @@ class Timer : BukkitRunnable() {
         val config = plugin.config
                 ?: return BlockRegenerator.info("Config is null");
 
-        if (!plugin.isPaused()) {
+        if (!plugin.paused()) {
 
             val max = config.getInt("max-blocks");
             var current: Int;
@@ -239,7 +289,7 @@ class Timer : BukkitRunnable() {
             }
 
             val endTime = System.currentTimeMillis()
-            plugin.debug("Regeneration complete, took " + (startTime - endTime) + "ms.")
+            plugin.debug("Regeneration complete, took ${startTime - endTime} ms.")
         }
     }
 }
