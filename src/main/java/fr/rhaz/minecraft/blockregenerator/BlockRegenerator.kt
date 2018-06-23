@@ -2,11 +2,18 @@ package fr.rhaz.minecraft.blockregenerator
 
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import org.bukkit.Bukkit
+import org.bukkit.Material
+import org.bukkit.block.Block
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.event.Listener
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 import java.io.IOException
+import java.awt.SystemColor.info
+import com.sun.deploy.util.GeneralUtil.getStringList
+import java.lang.Byte.parseByte
+
+
 
 class BlockRegeneratorPlugin: JavaPlugin(), Listener{
     override fun onEnable() = BlockRegenerator.init(this);
@@ -19,6 +26,7 @@ object BlockRegenerator{
     fun init(plugin: BlockRegeneratorPlugin) {
         this.plugin = plugin;
         config = loadConfig("config.yml");
+        loadWorlds();
         loadWorldGuard();
         if(worldGuard()) loadRegions();
     }
@@ -50,16 +58,17 @@ object BlockRegenerator{
 
     var worlds = ArrayList<String>();
     fun loadWorlds() {
-        debug("Loading worlds...")
-        for (world in config!!.getStringList("worlds")) {
-            this.debug("Checking if world $world exists.")
-            if (Bukkit.getWorld(world) == null) {
-                plugin!!.logger.info("Unknown world $world.")
-                debug("Nope, continuing to next iteration.")
-            } else {
-                debug("Yep it does, Adding world $world to list.")
-                worlds.add(world);
-            }
+
+        val config = this.config
+                ?: return debug("Config is null");
+
+        for (world in config.getStringList("worlds")) {
+
+            if (Bukkit.getWorld(world) == null)
+                info("Unknown world $world.");
+
+            else worlds.add(world);
+
         }
     }
 
@@ -71,7 +80,7 @@ object BlockRegenerator{
             return;
 
         val plugin = this.plugin?.server?.pluginManager?.getPlugin("WorldGuard")
-            ?: return info("Could not load WorldGuard");
+                ?: return info("Could not load WorldGuard");
 
         if (plugin !is WorldGuardPlugin)
             return plugin.logger.info("WorldGuard cannot be found.");
@@ -84,12 +93,16 @@ object BlockRegenerator{
 
         debug("Loading regions...");
 
-        val config = this.config ?: return debug("Config is null");
-        val worldguard = this.worldguard ?: return debug("WorldGuard is null");
+        val config = this.config
+                ?: return debug("Config is null");
+        val worldguard = this.worldguard
+                ?: return debug("WorldGuard is null");
 
         for (world in worlds) {
 
-            val regionmanager = worldguard.getRegionManager(Bukkit.getWorld(world));
+            val regionmanager = worldguard
+                    .getRegionManager(Bukkit.getWorld(world));
+
             for (region in config.getStringList("regions")) {
 
                 debug("Checking if region $region exists in world-guard regions...")
@@ -100,8 +113,44 @@ object BlockRegenerator{
                 }
 
                 else debug("Yep it does, Adding region $region to list.")
-                    .also{ regions.add(region) }
+                        .also{ regions.add(region) }
             }
+        }
+    }
+
+    var excludedMaterials = HashMap<Material, Byte>();
+    fun isExcluded(block: Block): Boolean {
+
+        val data = excludedMaterials.get(block.getType())
+            ?: return false;
+
+        return data == block.getData();
+    }
+    fun loadExcludedMaterials() {
+        debug("Loading excluded materials...")
+
+        val config = this.config
+            ?: return debug("Config is null");
+
+        for (block in config.getStringList("excluded-materials")) {
+
+            val array = block.split(":");
+
+            debug("Checking if ${array[0]} is a valid material.")
+
+            val m = Material.getMaterial(array[0])
+
+            if (m == null) {
+                info("Unknown material type " + array[0] + ".")
+                debug("Nope, continuing to next iteration.")
+            }
+
+            else {
+                val data: Byte = if (array.size > 1) parseByte(array[1]) else 0;
+                debug("Adding material $m with data value $data to list.")
+                excludedMaterials.put(m, data)
+            }
+
         }
     }
 }
