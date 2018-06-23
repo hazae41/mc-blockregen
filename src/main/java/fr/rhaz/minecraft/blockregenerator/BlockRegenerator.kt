@@ -1,23 +1,37 @@
+@file:Suppress("UNUSED_ANONYMOUS_PARAMETER", "DEPRECATION")
+
 package fr.rhaz.minecraft.blockregenerator
 
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import org.bukkit.Bukkit
 import org.bukkit.ChatColor
+import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.block.Block
 import org.bukkit.block.BlockState
-import org.bukkit.command.Command
-import org.bukkit.command.CommandSender
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.io.File
 import java.io.IOException
 import java.lang.Byte.parseByte
+import java.util.LinkedList
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
+import kotlin.collections.forEach
+import kotlin.collections.isEmpty
+import kotlin.collections.listOf
+import kotlin.collections.toMutableList
+import org.bukkit.Bukkit.getWorlds
+import org.bukkit.event.block.BlockBurnEvent
+import org.bukkit.event.entity.EntityExplodeEvent
+
 
 class BlockRegeneratorPlugin: JavaPlugin(), Listener{
-    override fun onEnable() = BlockRegenerator.init(this);
+    override fun onEnable() = BlockRegenerator.init(this)
 }
 
 object BlockRegenerator{
@@ -39,7 +53,7 @@ object BlockRegenerator{
         plugin.getCommand("regen").let {
             it.setExecutor {
                 sender, command, s, args ->
-                if(args.isEmpty()) false;
+                if(args.isEmpty()) true.not();
                 val lowerCase = args[0].toLowerCase();
                 when(lowerCase){
                     "forceregen", "fr" -> true.also{
@@ -107,15 +121,14 @@ object BlockRegenerator{
                 listOf("forceregen", "disableregen", "clearblocks", "rd");
             }
         };
+
+        plugin.server.pluginManager.registerEvents(listener, plugin);
+
         debug("BlockRegenerator has been Enabled.!");
     }
 
     var brokenBlocks = ArrayList<BlockState>();
     var placedBlocks = ArrayList<BlockState>();
-
-    var timer = Timer();
-    fun paused(): Boolean = config?.getBoolean("paused") ?: false;
-    fun paused(paused: Boolean) = config?.set("paused", paused);
 
     var debugging = true;
     fun debug(debug: String) {
@@ -205,14 +218,35 @@ object BlockRegenerator{
             }
         }
     }
+    fun protected(block: Block): Boolean {
+
+        val parents = LinkedList<String>()
+        val regions = LinkedList<String>()
+        val worldguard = this.worldguard ?: return true;
+
+        for (region in worldguard.getRegionManager(block.world).getApplicableRegions(block.location)) {
+            regions.add(region.id);
+            var parent = region.parent;
+            while (parent != null) {
+                parents.add(parent.id)
+                parent = parent.parent;
+            }
+        }
+
+        for (parent in parents)
+            regions.remove(parent)
+
+        if(regions.isEmpty()) return false;
+        return this.regions.contains(regions[0])
+    }
 
     var excludedMaterials = HashMap<Material, Byte>();
-    fun isExcluded(block: Block): Boolean {
+    fun excluded(block: Block): Boolean {
 
-        val data = excludedMaterials.get(block.getType())
+        val data = excludedMaterials[block.type]
             ?: return false;
 
-        return data == block.getData();
+        return data == block.data;
     }
     fun loadExcludedMaterials() {
         debug("Loading excluded materials...")
@@ -236,60 +270,120 @@ object BlockRegenerator{
             else {
                 val data: Byte = if (array.size > 1) parseByte(array[1]) else 0;
                 debug("Adding material $m with data value $data to list.")
-                excludedMaterials.put(m, data)
+                excludedMaterials[m] = data
             }
 
         }
     }
-}
 
-class Timer : BukkitRunnable() {
+    var timer = object: BukkitRunnable(){
+        override fun run() {
 
-    override fun run() {
+            val plugin = BlockRegenerator;
 
-        val plugin = BlockRegenerator;
+            val config = plugin.config
+                    ?: return BlockRegenerator.info("Config is null");
 
-        val config = plugin.config
-                ?: return BlockRegenerator.info("Config is null");
+            if (!plugin.paused()) {
 
-        if (!plugin.paused()) {
+                val max = config.getInt("max-blocks");
+                var current: Int;
 
-            val max = config.getInt("max-blocks");
-            var current: Int;
+                val placed = plugin.placedBlocks.toMutableList();
+                val broken = plugin.brokenBlocks.toMutableList();
 
-            val placed = plugin.placedBlocks.toMutableList();
-            val broken = plugin.brokenBlocks.toMutableList();
+                plugin.debug("Performing block regeneration.");
+                val startTime = System.currentTimeMillis();
 
-            plugin.debug("Performing block regeneration.");
-            val startTime = System.currentTimeMillis();
+                current = 0;
+                for(state in placed) {
+                    state.location.block.type = Material.AIR;
+                    plugin.placedBlocks.removeAt(current);
+                    if(current++ >= max) break;
+                }
 
-            current = 0;
-            for(state in placed) {
-                state.location.block.type = Material.AIR;
-                plugin.placedBlocks.removeAt(current);
-                if(current++ >= max) break;
+                current = 0;
+                for (state in broken) {
+
+                    plugin.debug(
+                            "MATERIAL: ${state.type}," +
+                                    "DATA: ${state.data}, " +
+                                    "X: ${state.x}, " +
+                                    "Y: ${state.y}, " +
+                                    "Z: ${state.z}, " +
+                                    "WORLD: ${state.world.name}"
+                    )
+
+                    state.location.block.type = state.type
+                    state.location.block.data = state.data.data
+                    plugin.brokenBlocks.removeAt(current);
+                    if(current++ > max) break;
+                }
+
+                val endTime = System.currentTimeMillis()
+                plugin.debug("Regeneration complete, took ${startTime - endTime} ms.")
             }
+        }
+    };
+    fun paused(): Boolean = config?.getBoolean("paused") ?: false;
+    fun paused(paused: Boolean) = config?.set("paused", paused);
 
-            current = 0;
-            for (state in broken) {
+    fun creative(): Boolean = config?.getBoolean("creative-regen-ignored") ?: false;
+    fun creative(creative: Boolean) = config?.set("creative-regen-ignored", creative);
 
-                plugin.debug(
-                    "MATERIAL: ${state.type}," +
-                    "DATA: ${state.data}, " +
-                    "X: ${state.x}, " +
-                    "Y: ${state.y}, " +
-                    "Z: ${state.z}, " +
-                    "WORLD: ${state.world.name}"
-                )
+    var listener = object: Listener{
+        @EventHandler
+        fun onBlockBreak(e: BlockBreakEvent) {
 
-                state.location.block.type = state.type
-                state.location.block.data = state.data.data
-                plugin.brokenBlocks.removeAt(current);
-                if(current++ > max) break;
+            if (creative())
+                if(e.player.gameMode == GameMode.CREATIVE)
+                    return
+
+            val config = BlockRegenerator.config ?: return debug("Config is null");
+
+            if (!config.getBoolean("restore-destroyed"))
+                return;
+            if(!protected(e.block))
+                return;
+            if(!worlds.contains(e.block.world.name))
+                return;
+            if(excluded(e.block))
+                return;
+            if(paused())
+                return;
+            brokenBlocks.add(e.block.state);
+        }
+
+        @EventHandler
+        fun onBlockBurn(e: BlockBurnEvent) {
+            if(!protected(e.block))
+                return;
+            if(!worlds.contains(e.block.world.name))
+                return;
+            if(excluded(e.block))
+                return;
+            if(paused())
+                return;
+            brokenBlocks.add(e.block.state);
+        }
+
+        @EventHandler
+        fun onBlockExplode(e: EntityExplodeEvent) {
+            val config = BlockRegenerator.config ?: return debug("Config is null");
+
+            if(paused())
+                return;
+            if(!worlds.contains(e.location.world.name))
+                return;
+            if (!config.getBoolean("restore-destroyed"))
+                return;
+            for(block in e.blockList()){
+                if(!protected(block))
+                    continue;
+                if(excluded(block))
+                    continue;
+                brokenBlocks.add(block.state);
             }
-
-            val endTime = System.currentTimeMillis()
-            plugin.debug("Regeneration complete, took ${startTime - endTime} ms.")
         }
     }
 }
