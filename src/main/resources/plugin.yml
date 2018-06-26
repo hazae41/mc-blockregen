@@ -1,6 +1,6 @@
 name: BlockRegenerator
-version: 1.0
-main: fr.rhaz.minecraft.blockregenerator.BlockRegeneratorPlugin
+version: ${project.version}
+main: fr.rhaz.minecraft.BlockRegeneratorPlugin
 author: Hazae41
 softdepend: [WorldGuard]
 
