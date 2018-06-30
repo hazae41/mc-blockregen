@@ -2,20 +2,20 @@ name: BlockRegenerator
 version: ${project.version}
 main: fr.rhaz.minecraft.BlockRegeneratorPlugin
 author: Hazae41
-softdepend: [WorldGuard]
+depend: [Kotlin4MC]
+softdepend: [WorldGuard, Factions]
 
 commands:
     blockregen:
+        aliases: [br]
         description: "Base command for BlockRegenerator."
-        usage: "\u00a7cCorrect Usage: /<command> <forceregen|disableregen|clearblocks>"
-        permission: blockregen.command.blockregen
-        permission-message: "\u00a7cYou don't have permission to perform this command."
+        usage: "/<command> <force, toggle, clear, debug, reload>"
 
 permissions:
     blockregen.*:
         children:
-            blockregen.command.blockregen: true
-            blockregen.action.forceregen: true
-            blockregen.action.disableregen: true
-            blockregen.action.clearblocks: true
-            blockregen.action.rd: true
+            blockregen.force: true
+            blockregen.toggle: true
+            blockregen.clear: true
+            blockregen.debug: true
+            blockregen.reload: true
