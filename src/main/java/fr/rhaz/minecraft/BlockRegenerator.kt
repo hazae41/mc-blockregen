@@ -1,4 +1,4 @@
-@file:Suppress("UNUSED_ANONYMOUS_PARAMETER", "DEPRECATION")
+@file:Suppress("UNUSED_ANONYMOUS_PARAMETER", "DEPRECATION", "UNUSED_DESTRUCTURED_PARAMETER_ENTRY")
 
 package fr.rhaz.minecraft
 
@@ -10,6 +10,7 @@ import org.bukkit.*
 import org.bukkit.block.Block
 import org.bukkit.block.BlockState
 import org.bukkit.command.CommandExecutor
+import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.event.EventHandler
@@ -22,12 +23,16 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.io.File
 import java.io.IOException
+import java.util.*
+import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
 
 
 class BlockRegeneratorPlugin: JavaPlugin(), Listener{
     override fun onEnable() = BlockRegenerator.init(this)
 }
+
+fun CommandSender.msg(msg: String) = sendMessage(msg.replace("&", "§"))
 
 fun Logger.donate(server: Server) {
     val file = File(".noads")
@@ -37,9 +42,9 @@ fun Logger.donate(server: Server) {
             .map { plugin -> plugin.description.name }
     this.info("""
     |
-    |         __         _    ____  __   ___
-    |        |__) |__|  /_\   ___/ |  \ |__  \  /
-    |	|  \ |  | /   \ /___  |__/ |___  \/
+    |    __         _    ____  __   ___
+    |   |__) |__|  /_\   ___/ |  \ |__  \  /
+    |   |  \ |  | /   \ /___  |__/ |___  \/
     |
     |   It seems you use $plugins
     |
@@ -61,19 +66,17 @@ object BlockRegenerator{
     fun init(plugin: BlockRegeneratorPlugin) {
         this.plugin = plugin;
 
-        val config = loadConfig() ?:
+        config = loadConfig() ?:
             return info("Config could not be loaded");
 
         loadWorldGuard();
         loadFactions()
 
-        timer.runTaskTimer(plugin, 0L,config.getLong("regen-delay") * 20L * 60L);
-
         plugin.getCommand("blockregen").let {
             it.executor = cmd
             it.tabCompleter = TabCompleter{
                 _, _, _, _ ->
-                listOf("force", "disable", "clear", "debug", "reload");
+                listOf("force", "disable", "info", "clear", "debug", "reload");
             }
         };
 
@@ -81,13 +84,23 @@ object BlockRegenerator{
 
         debug("BlockRegenerator has been Enabled.!");
         plugin.logger.donate(plugin.server)
+
+        schedule()
     }
 
     val cmd = CommandExecutor { sender, command, s, args ->
 
-        if(args.isEmpty()) return@CommandExecutor false;
+        val help = {
+            sender.msg("&6BLOCK REGENERATOR &7v${plugin.description.version}&8:")
+            listOf("force", "toggle", "info", "clear", "debug", "reload").forEach{
+                sender.msg("&7/br &6$it")
+            }
+            true
+        }
 
-        val noperm = {sender.sendMessage(
+        if(args.isEmpty()) return@CommandExecutor help()
+
+        val noperm = {sender.msg(
             "${ChatColor.RED}You don't have permission to do that.")}
 
         when(args[0].toLowerCase()) {
@@ -96,11 +109,9 @@ object BlockRegenerator{
                 if (!sender.hasPermission("blockregen.force"))
                     return@also noperm()
 
-                sender.sendMessage("${ChatColor.GREEN}" +
-                        "Forcing block regeneration...");
-                timer.run();
-                sender.sendMessage("${ChatColor.GREEN}" +
-                        "Regeneration Complete!");
+                sender.msg("&6Forcing block regeneration...");
+                regen.run();
+                sender.msg("&6Regeneration Complete!");
 
             }
             "toggle", "t" -> true.also {
@@ -110,27 +121,33 @@ object BlockRegenerator{
 
                 when(paused()){
                     true -> paused(false).also {
-                        sender.sendMessage("${ChatColor.GREEN}" +
-                        "Block regeneration enabled.");
+                        sender.msg("&6Block regeneration enabled.");
                     }
                     false -> paused(true).also {
-                        sender.sendMessage("${ChatColor.GREEN}" +
-                        "Block regeneration disabled.");
+                        sender.msg("&6Block regeneration disabled.");
                     }
                 }
+            }
+            "info", "i" -> true.also{
+                if (!sender.hasPermission("blockregen.info"))
+                    return@also noperm()
+
+                val placed = blocks.filter { (k,v) -> v == "placed" }
+                val broken = blocks.filter { (k,v) -> v == "broken" }
+
+                ("&6${blocks.size} blocks. " +
+                "(${placed.size} placed, ${broken.size} broken)")
+                .also { info(it); sender.msg(it) };
+
             }
             "clear", "c" -> true.also {
 
                 if (!sender.hasPermission("blockregen.clear"))
                     return@also noperm()
 
-                info("Blocks forcibly cleared by ${sender.name}");
+                info("&6Blocks forcibly cleared by ${sender.name}");
 
-                "${placed.size + broken.size} blocks lost. " +
-                "(${placed.size} placed, ${broken.size} broken)"
-                .also { info(it); sender.sendMessage(it) };
-
-                listOf(placed, broken).forEach { it.clear() };
+                blocks.clear();
 
             }
             "debug", "d" -> true.also {
@@ -140,10 +157,10 @@ object BlockRegenerator{
 
                 when(debugging()){
                     true -> debugging(false).also{
-                        sender.sendMessage("${ChatColor.RED}Runtime debugging disabled.");
+                        sender.msg("&6Runtime debugging disabled.");
                     }
                     false -> debugging(true).also {
-                        sender.sendMessage("${ChatColor.GREEN}Runtime debugging enabled.")
+                        sender.msg("&6Runtime debugging enabled.")
                     }
                 }
             }
@@ -153,15 +170,18 @@ object BlockRegenerator{
                     return@also noperm()
 
                 config = loadConfig() ?:
-                    return@also sender.sendMessage("Could not load config");
-                sender.sendMessage("Config reloaded")
+                    return@also sender.msg("&cCould not load config");
+
+                Bukkit.getScheduler().cancelTasks(plugin)
+                schedule();
+                sender.msg("&6Config reloaded")
             }
-            else -> false;
+            "help", "h" -> help();
+            else -> help();
         }
     }
 
-    var broken = ArrayList<BlockState>();
-    var placed = ArrayList<BlockState>();
+    var blocks = mutableListOf<Pair<BlockState, String>>();
 
     fun debugging() = config.getBoolean("debugging")
     fun debugging(enabled: Boolean) = config.set("debugging", enabled).also { saveConfig() }
@@ -171,7 +191,7 @@ object BlockRegenerator{
         info("[BR][D] $debug");
         for (player in Bukkit.getOnlinePlayers())
             if (player.hasPermission("blockregen.rd"))
-                player.sendMessage("[BR][D] $debug")
+                player.msg("[BR][D] $debug")
     }
 
     lateinit var config: YamlConfiguration;
@@ -282,53 +302,71 @@ object BlockRegenerator{
         run factions@{
             if(!useFactions()) return@factions
 
-            val wilderness = config.getString("factions.wilderness")
+            val type = config.getString("factions.type")
+
+            val factions = config.getStringList("factions.factions")
 
             val faction = BoardColl.get().getFactionAt(PS.valueOf(block))
 
-            if(faction.name != wilderness)
-                return false
+            when(type){
+                "whitelist" -> if(!factions.contains(faction.name)) return false
+                "blacklist" -> if(factions.contains(faction.name)) return false
+                else -> info("factions.type is misconfigured, it should be whitelist or blacklist")
+            }
         }
 
     }
 
-    var timer = object: BukkitRunnable(){
+    fun schedule(){
+        val delay = config.getLong("regen-delay");
+        val unit = TimeUnit.valueOf(config.getString("regen-delay-unit").toUpperCase())
+        val seconds = TimeUnit.SECONDS.convert(delay, unit)
+        regen = Regen();
+        regen.runTaskTimer(plugin, 0L, seconds * 20L);
+    }
+
+    lateinit var regen: Regen;
+    class Regen: BukkitRunnable(){
         override fun run() {
 
             if(paused()) return;
 
-            val max = config.getInt("max-blocks");
-            var current: Int;
+            val max = config.getInt("max-blocks").takeIf { it > 0 } ?: Int.MAX_VALUE
 
-            val placed = placed.toMutableList();
-            val broken = broken.toMutableList();
+            val blocks = blocks.toMutableList().take(max)
 
             debug("Performing block regeneration.");
             val startTime = System.currentTimeMillis();
 
-            current = 0;
-            for(state in placed) {
-                state.location.block.type = Material.AIR;
-                placed.removeAt(current);
-                if(current++ >= max) break;
-            }
+            val efficiency = config.getInt("percentage-efficiency")
 
-            current = 0;
-            for (state in broken) {
+            for(pair in blocks) {
+
+                BlockRegenerator.blocks.remove(pair)
+
+                val state = pair.first
+                val type = pair.second
 
                 debug(
-            "MATERIAL: ${state.type}," +
-                    "DATA: ${state.data}, " +
-                    "X: ${state.x}, " +
-                    "Y: ${state.y}, " +
-                    "Z: ${state.z}, " +
-                    "WORLD: ${state.world.name}"
+                "MATERIAL: ${state.type}," +
+                "DATA: ${state.data}, " +
+                "X: ${state.x}, " +
+                "Y: ${state.y}, " +
+                "Z: ${state.z}, " +
+                "WORLD: ${state.world.name}"
                 )
 
-                state.location.block.type = state.type
-                state.location.block.data = state.data.data
-                broken.removeAt(current);
-                if(current++ > max) break;
+                if(Random().nextInt(100) >= efficiency)
+                    continue;
+
+                when(type){
+                    "placed" -> state.location.block.type = Material.AIR;
+                    "broken" -> {
+                        state.location.block.type = state.type
+                        state.location.block.data = state.data.data
+                    }
+                }
+
             }
 
             val endTime = System.currentTimeMillis()
@@ -350,7 +388,7 @@ object BlockRegenerator{
             if (ignorecreative() && e.player.gameMode == GameMode.CREATIVE) return
             if (!config.getBoolean("restore-destroyed")) return;
 
-            if(restore(e.block)) broken.add(e.block.state);
+            if(restore(e.block)) blocks.add(Pair(e.block.state, "broken"));
         }
 
         @EventHandler
@@ -359,7 +397,7 @@ object BlockRegenerator{
             if(paused()) return;
             if (!config.getBoolean("restore-destroyed")) return;
 
-            if(restore(e.block)) broken.add(e.block.state);
+            if(restore(e.block)) blocks.add(Pair(e.block.state, "broken"));
         }
 
         @EventHandler
@@ -369,7 +407,7 @@ object BlockRegenerator{
             if (!config.getBoolean("restore-destroyed")) return;
 
             for(block in e.blockList())
-                if(restore(block)) broken.add(block.state);
+                if(restore(block)) blocks.add(Pair(block.state, "broken"));
         }
 
         @EventHandler
@@ -377,9 +415,9 @@ object BlockRegenerator{
 
             if(paused()) return;
             if (ignorecreative() && e.player.gameMode == GameMode.CREATIVE) return
-            if (config.getBoolean("restore-placed")) return;
+            if (!config.getBoolean("restore-placed")) return;
 
-            if(restore(e.block)) placed.add(e.block.state);
+            if(restore(e.block)) blocks.add(Pair(e.block.state, "placed"));
         }
     }
 }

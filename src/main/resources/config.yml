@@ -1,30 +1,46 @@
+#     __         _    ____  __   ___
+#    |__) |__|  /_\   ___/ |  \ |__  \  /
+#	 |  \ |  | /   \ /___  |__/ |___  \/
+#
+#   If you like my softwares or you just want to support me, I'd enjoy donations.
+#   By donating, you're going to encourage me to continue developing quality softwares.
+#   And you'll be added to the donators list!
+#
+#   Click here to donate: http://dev.rhaz.fr/donate
+#
+
 debugging: false
 #I wouldn't change this as it makes console and in game chat very very spammy.
 
-regen-delay: 1
-#Delay before restoring broken/placed/destroyed blocks.
+regen-delay: 30
+# Delay between each regeneration
+regen-delay-unit: "minutes"
+# Can be [seconds, minutes, hours, days]
+
+max-blocks: 10
+# Number of blocks restored at each regeneration
+
+percentage-efficiency: 90
+# X% of blocks will be restored, the rest will be ignored
 
 paused: false
 #While this is true blocks will not be regenerated and any blocks broken during it
 #won't be restored by this plugin. But blocks broken before and after it will.
 
-max-blocks: 0
-#If you believe this plugin is lagging your server,
-#this is the max amount of blocks that it will restore.
-
 restore-destroyed: true
-#Should this plugin restore destroyed blocks? (this includes explosions)
+# Should this plugin restore destroyed blocks? (this includes explosions)
+
 restore-placed: true
-#Should this plugin restore placed blocks?
+# Should this plugin restore placed blocks?
 
 ignore-creative: false
-#Blocks broken/placed by people in creative wont be restored if this is true.
+# Blocks broken/placed by people in creative wont be restored if this is true.
 
 worlds:
   enabled: true
   type: whitelist
-  # Whitelist: only restore blocks in worlds
-  # Blacklist: only restore blocks not in worlds
+  # Whitelist: only restore blocks in these worlds
+  # Blacklist: do not restore blocks in these worlds
   worlds:
   - world
   - world_nether
@@ -33,23 +49,25 @@ worlds:
 materials:
   enabled: true
   type: blacklist
-  # Whitelist: only restore blocks types in materials
-  # Blacklist: only restore blocks types not in materials
+  # Whitelist: only restore blocks materials in these materials
+  # Blacklist: do not restore blocks materials in these materials
   materials:
-  #-BLOCK_NAME:ID (example: STONE:0 would be just normal stone)
+  - "BLOCK_NAME:ID" # (example: STONE:0 would be just normal stone)
 
 worldguard:
   enabled: false
   #If you do not have WorldGuard leave this disabled
   type: whitelist
-  # Whitelist: only restore blocks in regions
-  # Blacklist: only restore blocks not in regions
-  regions: #The regions to regenerate broken/placed/exploded blocks in.
-  #- "region_name"
+  # Whitelist: only restore blocks in these regions
+  # Blacklist: do not restore blocks in these regions
+  regions:
+  - "region_name"
 
 factions:
   enabled: false
-  # Only restore blocks in Wilderness
-  wilderness: "Wilderness"
-  # Name of the wilderness faction
+  type: whitelist
+  # Whitelist: only restore blocks in these factions
+  # Blacklist: do not restore blocks in these factions
+  factions:
+  - "Wilderness"
 
