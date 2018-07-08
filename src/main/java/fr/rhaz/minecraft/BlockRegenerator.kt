@@ -204,16 +204,18 @@ object BlockRegenerator{
     }
 
     var dependencies = mutableListOf<String>()
+    fun findDependencies(){
+        dependencies.clear()
+        listOf("WorldGuard", "Factions", "GriefPrevention").forEach c@{
 
-    fun findDependencies() = listOf("WorldGuard", "Factions", "GriefPrevention").forEach c@{
+            if (!config.getBoolean("${it.toLowerCase()}.enabled"))
+                return@c;
 
-        if (!config.getBoolean("$it.enabled"))
-            return@c;
+            plugin.server?.pluginManager?.getPlugin(it)
+                    ?: return@c info("Could not load $it")
 
-        plugin.server?.pluginManager?.getPlugin(it)
-            ?: return@c info("Could not load $it")
-
-        dependencies.add(it)
+            dependencies.add(it)
+        }
     }
 
     fun restore(block: Block): Boolean = true.also{
