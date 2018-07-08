@@ -71,3 +71,9 @@ factions:
   factions:
   - "Wilderness"
 
+griefprevention:
+  enabled: false
+  admins-claims: false
+  # Should this plugin restore admins claims?
+  players-claims: true
+  # Should this plugin restore players claims?

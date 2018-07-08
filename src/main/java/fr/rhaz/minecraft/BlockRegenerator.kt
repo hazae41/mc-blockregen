@@ -2,11 +2,14 @@
 
 package fr.rhaz.minecraft
 
-import com.massivecraft.factions.Factions
 import com.massivecraft.factions.entity.BoardColl
 import com.massivecraft.massivecore.ps.PS
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
-import org.bukkit.*
+import me.ryanhamshire.GriefPrevention.GriefPrevention
+import org.bukkit.Bukkit
+import org.bukkit.GameMode
+import org.bukkit.Material
+import org.bukkit.Server
 import org.bukkit.block.Block
 import org.bukkit.block.BlockState
 import org.bukkit.command.CommandExecutor
@@ -69,9 +72,6 @@ object BlockRegenerator{
         config = loadConfig() ?:
             return info("Config could not be loaded");
 
-        loadWorldGuard();
-        loadFactions()
-
         plugin.getCommand("blockregen").let {
             it.executor = cmd
             it.tabCompleter = TabCompleter{
@@ -88,89 +88,82 @@ object BlockRegenerator{
         schedule()
     }
 
-    val cmd = CommandExecutor { sender, command, s, args ->
+    val cmd = CommandExecutor { sender, command, s, args -> true.also cmd@{
 
         val help = {
             sender.msg("&6BLOCK REGENERATOR &7v${plugin.description.version}&8:")
-            listOf("force", "toggle", "info", "clear", "debug", "reload").forEach{
-                sender.msg("&7/br &6$it")
-            }
-            true
+            listOf("force", "toggle", "info", "clear", "debug", "reload")
+                .forEach{ sender.msg("&7/br &6$it") }
         }
 
-        if(args.isEmpty()) return@CommandExecutor help()
+        if(args.isEmpty()) return@cmd help()
 
-        val noperm = {sender.msg(
-            "${ChatColor.RED}You don't have permission to do that.")}
+        val noperm = {sender.msg("&cYou don't have permission to do that.")}
 
         when(args[0].toLowerCase()) {
-            "force", "f" -> true.also {
+            "force", "f" -> {
 
                 if (!sender.hasPermission("blockregen.force"))
-                    return@also noperm()
+                    return@cmd noperm()
 
                 sender.msg("&6Forcing block regeneration...");
                 regen.run();
                 sender.msg("&6Regeneration Complete!");
 
             }
-            "toggle", "t" -> true.also {
+            "toggle", "t" -> {
 
                 if (!sender.hasPermission("blockregen.toggle"))
-                    return@also noperm()
+                    return@cmd noperm()
 
                 when(paused()){
                     true -> paused(false).also {
-                        sender.msg("&6Block regeneration enabled.");
-                    }
+                        sender.msg("&6Block regeneration enabled."); }
                     false -> paused(true).also {
-                        sender.msg("&6Block regeneration disabled.");
-                    }
+                        sender.msg("&6Block regeneration disabled."); }
                 }
             }
-            "info", "i" -> true.also{
+            "info", "i" -> {
+
                 if (!sender.hasPermission("blockregen.info"))
-                    return@also noperm()
+                    return@cmd noperm()
 
                 val placed = blocks.filter { (k,v) -> v == "placed" }
                 val broken = blocks.filter { (k,v) -> v == "broken" }
 
-                ("&6${blocks.size} blocks. " +
-                "(${placed.size} placed, ${broken.size} broken)")
-                .also { info(it); sender.msg(it) };
+                ("&6${blocks.size} blocks. (${placed.size} placed, ${broken.size} broken)")
+                    .also { info(it); sender.msg(it) };
 
             }
-            "clear", "c" -> true.also {
+            "clear", "c" -> {
 
                 if (!sender.hasPermission("blockregen.clear"))
-                    return@also noperm()
+                    return@cmd noperm()
 
                 info("&6Blocks forcibly cleared by ${sender.name}");
 
                 blocks.clear();
 
             }
-            "debug", "d" -> true.also {
+            "debug", "d" -> {
 
                 if (!sender.hasPermission("blockregen.debug"))
-                    return@also noperm()
+                    return@cmd noperm()
 
                 when(debugging()){
                     true -> debugging(false).also{
-                        sender.msg("&6Runtime debugging disabled.");
-                    }
+                        sender.msg("&6Runtime debugging disabled."); }
                     false -> debugging(true).also {
-                        sender.msg("&6Runtime debugging enabled.")
-                    }
+                        sender.msg("&6Runtime debugging enabled.") }
                 }
             }
-            "reload", "r" -> true.also {
+            "reload", "r" -> {
 
                 if (!sender.hasPermission("blockregen.reload"))
-                    return@also noperm()
+                    return@cmd noperm()
 
                 config = loadConfig() ?:
-                    return@also sender.msg("&cCould not load config");
+                    return@cmd sender.msg("&cCould not load config");
 
                 Bukkit.getScheduler().cancelTasks(plugin)
                 schedule();
@@ -179,7 +172,7 @@ object BlockRegenerator{
             "help", "h" -> help();
             else -> help();
         }
-    }
+    }}
 
     var blocks = mutableListOf<Pair<BlockState, String>>();
 
@@ -201,6 +194,7 @@ object BlockRegenerator{
         if (!plugin.dataFolder.exists()) plugin.dataFolder.mkdir();
         if (!file.exists()) plugin.saveResource(name, false);
         config = YamlConfiguration.loadConfiguration(file) ?: return null;
+        findDependencies()
         return config;
     }
     fun saveConfig() {
@@ -209,40 +203,17 @@ object BlockRegenerator{
         } catch (e: IOException) { e.printStackTrace(); }
     }
 
-    lateinit var worldguard: WorldGuardPlugin;
-    fun useWorldGuard(): Boolean =
-        ::worldguard.isInitialized &&
-        config.getBoolean("worldguard.enabled")
-    fun loadWorldGuard(){
+    var dependencies = mutableListOf<String>()
 
-        if (!config.getBoolean("world-guard"))
-            return;
+    fun findDependencies() = listOf("WorldGuard", "Factions", "GriefPrevention").forEach c@{
 
-        val plugin = plugin.server?.pluginManager?.getPlugin("WorldGuard")
-                ?: return info("Could not load WorldGuard");
+        if (!config.getBoolean("$it.enabled"))
+            return@c;
 
-        if (plugin !is WorldGuardPlugin)
-            return plugin.logger.info("You're using a bad version of WorldGuard.");
+        plugin.server?.pluginManager?.getPlugin(it)
+            ?: return@c info("Could not load $it")
 
-        worldguard = plugin;
-    }
-
-    lateinit var factions: Factions;
-    fun useFactions(): Boolean =
-        ::factions.isInitialized &&
-        config.getBoolean("factions.enabled");
-    fun loadFactions(){
-
-        if (!config.getBoolean("factions.enabled"))
-            return;
-
-        val plugin = plugin.server?.pluginManager?.getPlugin("Factions")
-            ?: return info("Could not load Factions")
-
-        if(plugin !is Factions)
-            return plugin.logger.info("You're using a bad version of Factions")
-
-        factions = plugin
+        dependencies.add(it)
     }
 
     fun restore(block: Block): Boolean = true.also{
@@ -282,13 +253,13 @@ object BlockRegenerator{
         }
 
         run worlguard@{
-            if (!useWorldGuard()) return@worlguard
+            if ("WorldGuard" !in dependencies) return@worlguard
 
             val type = config.getString("worldguard.type")
 
             val pregions = config.getStringList("worldguard.regions")
 
-            val bregions = worldguard
+            val bregions = WorldGuardPlugin.inst()!!
                     .getRegionManager(block.world)
                     .getApplicableRegions(block.location);
 
@@ -300,7 +271,7 @@ object BlockRegenerator{
         }
 
         run factions@{
-            if(!useFactions()) return@factions
+            if("Factions" !in dependencies) return@factions
 
             val type = config.getString("factions.type")
 
@@ -313,6 +284,22 @@ object BlockRegenerator{
                 "blacklist" -> if(factions.contains(faction.name)) return false
                 else -> info("factions.type is misconfigured, it should be whitelist or blacklist")
             }
+        }
+
+        run griefprevention@{
+            if("GriefPrevention" in dependencies) return@griefprevention
+
+            val restoreadmins = config.getBoolean("griefprevention.admins-claims")
+            val restoreplayers = config.getBoolean("griefprevention.players-claims")
+
+            val claim = GriefPrevention.instance.dataStore.getClaimAt(block.location, false, null)
+                ?: return@griefprevention
+
+            when(claim.isAdminClaim){
+                true -> if(!restoreadmins) return false
+                false -> if(!restoreplayers) return false
+            }
+
         }
 
     }
