@@ -130,10 +130,10 @@ object BlockRegenerator{
                     return@cmd noperm()
 
                 val blocks = get()
-                val placed = blocks.filter { e -> e.action == "placed" }
-                val broken = blocks.filter { e -> e.action == "broken" }
+                val placed = blocks.filter { e -> e.action == "placed" }.size
+                val broken = blocks.filter { e -> e.action == "broken" }.size
 
-                ("&6${blocks.size} blocks. (${placed.size} placed, ${broken.size} broken)")
+                "&6${blocks.size} blocks. ($placed placed, $broken broken)"
                     .also { info(it); sender.msg(it) };
             }
             "clear", "c" -> {
@@ -307,12 +307,19 @@ object BlockRegenerator{
 
     }
 
+    fun unit(unit: String): TimeUnit = when(unit){
+        "seconds", "second", "sec", "s" -> TimeUnit.SECONDS
+        "minutes", "minute", "min", "m" -> TimeUnit.MINUTES
+        "hours", "hour", "h" -> TimeUnit.HOURS
+        "days", "day", "d" -> TimeUnit.DAYS
+        else -> TimeUnit.MINUTES
+    }
+
     fun schedule(){
-        val delay = config.getLong("regen-delay");
-        val unit = TimeUnit.valueOf(config.getString("regen-delay-unit").toUpperCase())
-        val seconds = TimeUnit.SECONDS.convert(delay, unit)
+        val s = config.getString("regen-delay").split(" ")
+        val delay = TimeUnit.SECONDS.convert(s[0].toLongOrNull() ?: return, unit(s[1]))
         regen = Regen();
-        regen.runTaskTimer(plugin, 0L, seconds * 20L);
+        regen.runTaskTimer(plugin, 0L, delay * 20L);
     }
 
     lateinit var regen: Regen;
@@ -323,9 +330,9 @@ object BlockRegenerator{
 
             val max = config.getInt("max-blocks").takeIf { it > 0 } ?: 100
 
-            val mintime = config.getLong("min-time")
-            val unit = TimeUnit.valueOf(config.getString("min-time-unit").toUpperCase())
-            val milliseconds = TimeUnit.MILLISECONDS.convert(mintime, unit)
+            val s = config.getString("min-time").split(" ")
+            val milliseconds = TimeUnit.MILLISECONDS
+                    .convert(s[0].toLongOrNull() ?: return, unit(s[1]))
 
             val blocks = get().take(max)
 

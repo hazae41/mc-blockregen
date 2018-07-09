@@ -12,14 +12,12 @@
 debugging: false
 #I wouldn't change this as it makes console and in game chat very very spammy.
 
-regen-delay: 30
+regen-delay: "30 minutes"
 # Delay between each regeneration
-regen-delay-unit: "minutes"
 # Can be [seconds, minutes, hours, days]
 
-min-time: 2
+min-time: "2 days"
 # Minimum time after which a block is considered as "old" and will be regenerated
-min-time-unit: "days"
 # Can be [seconds, minutes, hours, days]
 
 max-blocks: 10
