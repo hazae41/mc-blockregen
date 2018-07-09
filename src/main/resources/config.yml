@@ -17,6 +17,11 @@ regen-delay: 30
 regen-delay-unit: "minutes"
 # Can be [seconds, minutes, hours, days]
 
+min-time: 2
+# Minimum time after which a block is considered as "old" and will be regenerated
+min-time-unit: "days"
+# Can be [seconds, minutes, hours, days]
+
 max-blocks: 10
 # Number of blocks restored at each regeneration
 

@@ -6,12 +6,8 @@ import com.massivecraft.factions.entity.BoardColl
 import com.massivecraft.massivecore.ps.PS
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import me.ryanhamshire.GriefPrevention.GriefPrevention
-import org.bukkit.Bukkit
-import org.bukkit.GameMode
-import org.bukkit.Material
-import org.bukkit.Server
+import org.bukkit.*
 import org.bukkit.block.Block
-import org.bukkit.block.BlockState
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
@@ -22,10 +18,10 @@ import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockBurnEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.event.entity.EntityExplodeEvent
+import org.bukkit.material.MaterialData
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
 import java.io.File
-import java.io.IOException
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
@@ -59,7 +55,7 @@ fun Logger.donate(server: Server) {
     |
     """.trimMargin("|"))
     file.createNewFile()
-    Thread{ Thread.sleep(1000); file.delete()}.start()
+    Thread{ Thread.sleep(2000); file.delete()}.start()
 }
 
 object BlockRegenerator{
@@ -71,6 +67,11 @@ object BlockRegenerator{
 
         config = loadConfig() ?:
             return info("Config could not be loaded");
+
+        data = loadData() ?:
+            return info("Data could not be loaded")
+
+        findDependencies()
 
         plugin.getCommand("blockregen").let {
             it.executor = cmd
@@ -128,12 +129,12 @@ object BlockRegenerator{
                 if (!sender.hasPermission("blockregen.info"))
                     return@cmd noperm()
 
-                val placed = blocks.filter { (k,v) -> v == "placed" }
-                val broken = blocks.filter { (k,v) -> v == "broken" }
+                val blocks = get()
+                val placed = blocks.filter { e -> e.action == "placed" }
+                val broken = blocks.filter { e -> e.action == "broken" }
 
                 ("&6${blocks.size} blocks. (${placed.size} placed, ${broken.size} broken)")
                     .also { info(it); sender.msg(it) };
-
             }
             "clear", "c" -> {
 
@@ -142,7 +143,7 @@ object BlockRegenerator{
 
                 info("&6Blocks forcibly cleared by ${sender.name}");
 
-                blocks.clear();
+                execute { emptyList() }
 
             }
             "debug", "d" -> {
@@ -165,6 +166,8 @@ object BlockRegenerator{
                 config = loadConfig() ?:
                     return@cmd sender.msg("&cCould not load config");
 
+                findDependencies()
+
                 Bukkit.getScheduler().cancelTasks(plugin)
                 schedule();
                 sender.msg("&6Config reloaded")
@@ -174,10 +177,8 @@ object BlockRegenerator{
         }
     }}
 
-    var blocks = mutableListOf<Pair<BlockState, String>>();
-
     fun debugging() = config.getBoolean("debugging")
-    fun debugging(enabled: Boolean) = config.set("debugging", enabled).also { saveConfig() }
+    fun debugging(enabled: Boolean) = config.apply{ set("debugging", enabled); save(configfile)}
     fun info(msg: String) = plugin.logger.info(msg)
     fun debug(debug: String) {
         if (!debugging()) return;
@@ -188,19 +189,19 @@ object BlockRegenerator{
     }
 
     lateinit var config: YamlConfiguration;
+    val configfile by lazy {File(plugin.dataFolder, "config.yml")}
     fun loadConfig(): YamlConfiguration? {
-        val name = "config.yml"
-        val file = File(plugin.dataFolder, name);
-        if (!plugin.dataFolder.exists()) plugin.dataFolder.mkdir();
-        if (!file.exists()) plugin.saveResource(name, false);
-        config = YamlConfiguration.loadConfiguration(file) ?: return null;
-        findDependencies()
-        return config;
+        if (!configfile.parentFile.exists()) configfile.parentFile.mkdir();
+        if (!configfile.exists()) plugin.saveResource(configfile.name, false);
+        return YamlConfiguration.loadConfiguration(configfile) ?: null;
     }
-    fun saveConfig() {
-        try {
-            config.save(File(plugin.dataFolder, "config.yml"));
-        } catch (e: IOException) { e.printStackTrace(); }
+
+    lateinit var data: YamlConfiguration;
+    val datafile by lazy {File(plugin.dataFolder, "data.yml")}
+    fun loadData(): YamlConfiguration? {
+        if (!datafile.parentFile.exists()) datafile.parentFile.mkdir();
+        if (!datafile.exists()) plugin.saveResource(datafile.name, false);
+        return YamlConfiguration.loadConfiguration(datafile) ?: null;
     }
 
     var dependencies = mutableListOf<String>()
@@ -289,7 +290,7 @@ object BlockRegenerator{
         }
 
         run griefprevention@{
-            if("GriefPrevention" in dependencies) return@griefprevention
+            if("GriefPrevention" !in dependencies) return@griefprevention
 
             val restoreadmins = config.getBoolean("griefprevention.admins-claims")
             val restoreplayers = config.getBoolean("griefprevention.players-claims")
@@ -320,39 +321,42 @@ object BlockRegenerator{
 
             if(paused()) return;
 
-            val max = config.getInt("max-blocks").takeIf { it > 0 } ?: Int.MAX_VALUE
+            val max = config.getInt("max-blocks").takeIf { it > 0 } ?: 100
 
-            val blocks = blocks.toMutableList().take(max)
+            val mintime = config.getLong("min-time")
+            val unit = TimeUnit.valueOf(config.getString("min-time-unit").toUpperCase())
+            val milliseconds = TimeUnit.MILLISECONDS.convert(mintime, unit)
+
+            val blocks = get().take(max)
 
             debug("Performing block regeneration.");
             val startTime = System.currentTimeMillis();
 
             val efficiency = config.getInt("percentage-efficiency")
 
-            for(pair in blocks) {
+            for(e in blocks) {
 
-                BlockRegenerator.blocks.remove(pair)
+                val diff = System.currentTimeMillis() - e.time
+                if(diff <= milliseconds) break
 
-                val state = pair.first
-                val type = pair.second
+                execute { drop(1) }
 
                 debug(
-                "MATERIAL: ${state.type}," +
-                "DATA: ${state.data}, " +
-                "X: ${state.x}, " +
-                "Y: ${state.y}, " +
-                "Z: ${state.z}, " +
-                "WORLD: ${state.world.name}"
+                "MATERIAL: ${e.mat.itemType.name}:${e.mat.data}," +
+                "X: ${e.loc.blockX}, " +
+                "Y: ${e.loc.blockY}, " +
+                "Z: ${e.loc.blockZ}, " +
+                "WORLD: ${e.loc.world.name}"
                 )
 
                 if(Random().nextInt(100) >= efficiency)
                     continue;
 
-                when(type){
-                    "placed" -> state.location.block.type = Material.AIR;
-                    "broken" -> {
-                        state.location.block.type = state.type
-                        state.location.block.data = state.data.data
+                when(e.action){
+                    "placed" -> e.loc.block.type = Material.AIR;
+                    "broken" -> e.loc.block.apply{
+                        type = e.mat.itemType
+                        data = e.mat.data
                     }
                 }
 
@@ -360,11 +364,12 @@ object BlockRegenerator{
 
             val endTime = System.currentTimeMillis()
             debug("Regeneration complete, took ${startTime - endTime} ms.")
+
         }
     };
 
     fun paused(): Boolean = config.getBoolean("paused")
-    fun paused(paused: Boolean) = config.set("paused", paused).also { saveConfig() }
+    fun paused(paused: Boolean) = config.apply { set("paused", paused); save(configfile)}
 
     fun ignorecreative(): Boolean = config.getBoolean("ignore-creative")
 
@@ -376,8 +381,10 @@ object BlockRegenerator{
             if(paused()) return;
             if (ignorecreative() && e.player.gameMode == GameMode.CREATIVE) return
             if (!config.getBoolean("restore-destroyed")) return;
+            if(!restore(e.block)) return
 
-            if(restore(e.block)) blocks.add(Pair(e.block.state, "broken"));
+            val ser = ser(entry(e.block, "broken"))
+            execute { add(ser); this }
         }
 
         @EventHandler
@@ -385,8 +392,10 @@ object BlockRegenerator{
 
             if(paused()) return;
             if (!config.getBoolean("restore-destroyed")) return;
+            if(!restore(e.block)) return
 
-            if(restore(e.block)) blocks.add(Pair(e.block.state, "broken"));
+            val ser = ser(entry(e.block, "broken"))
+            execute { add(ser); this }
         }
 
         @EventHandler
@@ -395,8 +404,11 @@ object BlockRegenerator{
             if(paused()) return;
             if (!config.getBoolean("restore-destroyed")) return;
 
-            for(block in e.blockList())
-                if(restore(block)) blocks.add(Pair(block.state, "broken"));
+            for(block in e.blockList()){
+                if(!restore(block)) continue
+                val ser = ser(entry(block, "broken"))
+                execute { add(ser); this }
+            }
         }
 
         @EventHandler
@@ -405,9 +417,57 @@ object BlockRegenerator{
             if(paused()) return;
             if (ignorecreative() && e.player.gameMode == GameMode.CREATIVE) return
             if (!config.getBoolean("restore-placed")) return;
+            if(!restore(e.block)) return
 
-            if(restore(e.block)) blocks.add(Pair(e.block.state, "placed"));
+            val ser = ser(entry(e.block, "placed"))
+            execute { add(ser); this }
         }
     }
-}
 
+    data class Entry(val loc: Location, val time: Long, val action: String, val mat: MaterialData)
+
+    fun entry(block: Block, action: String): Entry {
+        val mat = MaterialData(block.type, block.data)
+        return Entry(block.location, System.currentTimeMillis(), action, mat)
+    }
+
+    fun ser(e: Entry): String {
+        val mtype = e.mat.itemType.ordinal
+        val mdata = e.mat.data
+        return listOf(
+            e.loc.world.name,
+            e.loc.blockX,
+            e.loc.blockY,
+            e.loc.blockZ,
+            e.time,
+            e.action,
+            mtype, mdata
+        ).joinToString("/")
+    }
+
+    fun deser(data: String): Entry {
+        val split = data.split("/")
+
+        val world = Bukkit.getWorld(split[0])
+        val x = split[1].toDouble()
+        val y = split[2].toDouble()
+        val z = split[3].toDouble()
+        val loc = Location(world, x, y, z)
+
+        val time = split[4].toLong()
+
+        val action = split[5]
+
+        val mat = MaterialData(split[6].toInt(), split[7].toByte())
+
+        return Entry(loc, time = time, action = action, mat = mat)
+    }
+
+    fun execute(lambda: MutableList<String>.() -> List<String>) = data.apply {
+        val list = getStringList("data")
+        set("data", list.let(lambda))
+        save(datafile)
+    }
+
+    fun get() = data.getStringList("data").map { e -> deser(e) }
+}
