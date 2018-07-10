@@ -343,10 +343,9 @@ object BlockRegenerator{
     }
 
     fun schedule(){
-        val s = config.getString("regen-delay").split(" ")
-        val delay = TimeUnit.SECONDS.convert(s[0].toLongOrNull() ?: return, unit(s[1]))
-        regen = regen();
-        regen.runTaskTimer(plugin, 0L, delay * 20L);
+        val (udelay, unit) = config.getString("regen-delay").split(" ")
+        val delay = TimeUnit.SECONDS.convert(udelay.toLongOrNull() ?: return, unit(unit))
+        regen = regen().apply{runTaskTimer(plugin, 0L, delay * 20L)}
     }
 
     lateinit var regen: BukkitRunnable;
@@ -357,9 +356,9 @@ object BlockRegenerator{
 
             val max = config.getInt("max-blocks").takeIf { it > 0 } ?: 100
 
-            val s = config.getString("min-time").split(" ")
-            val milliseconds = TimeUnit.MILLISECONDS
-                    .convert(s[0].toLongOrNull() ?: return, unit(s[1]))
+            val (umintime, unit) = config.getString("min-time").split(" ")
+            val mintime = TimeUnit.MILLISECONDS
+                .convert(umintime.toLongOrNull() ?: return, unit(unit))
 
             val blocks = get().take(max)
 
@@ -371,7 +370,7 @@ object BlockRegenerator{
             for(e in blocks) {
 
                 val diff = System.currentTimeMillis() - e.time
-                if(diff <= milliseconds) break
+                if(diff <= mintime) break
 
                 execute { drop(1) }
 
@@ -408,7 +407,7 @@ object BlockRegenerator{
         get() = config.getBoolean("paused")
         set(value){ config.apply {set("paused", value); save(configfile)} }
 
-    var listener = object: Listener{
+    val listener = object: Listener{
 
         fun creative(p: Player) = p.gameMode == GameMode.CREATIVE
 
