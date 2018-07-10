@@ -81,10 +81,7 @@ object BlockRegenerator{
             executor = cmd
             aliases = listOf("br")
             description = "The Kotlinized BlockRegenerator!"
-            tabCompleter = TabCompleter{
-                _, _, _, _ ->
-                listOf("force", "disable", "info", "clear", "debug", "reload");
-            }
+            tabCompleter = TabCompleter{ _, _, _, _ -> cmds }
         };
 
         plugin.server.pluginManager.registerEvents(listener, plugin);
@@ -95,8 +92,8 @@ object BlockRegenerator{
     }
 
 
-
-    val cmd = CommandExecutor { sender, command, s, args -> true.also cmd@{
+    val cmds = listOf("force", "disable", "info", "clear", "debug", "reload");
+    val cmd = CommandExecutor { sender, command, label, args -> true.also cmd@{
 
         val noperm = {sender.msg("&cYou don't have permission to do that.")}
 
@@ -106,8 +103,7 @@ object BlockRegenerator{
                 return@help noperm()
 
             sender.msg("&6BLOCK REGENERATOR &7v${plugin.description.version}&8:")
-            listOf("force", "toggle", "info", "clear", "debug", "reload")
-                .forEach{ sender.msg("&7/br &6$it") }
+            cmds.forEach{ sender.msg("&7/$label &6$it") }
         }
 
         if(args.isEmpty()) return@cmd help()
@@ -337,9 +333,9 @@ object BlockRegenerator{
     fun unit(unit: String): TimeUnit = when(unit){
         "seconds", "second", "sec", "s" -> TimeUnit.SECONDS
         "minutes", "minute", "min", "m" -> TimeUnit.MINUTES
-        "hours", "hour", "h" -> TimeUnit.HOURS
-        "days", "day", "d" -> TimeUnit.DAYS
-        else -> TimeUnit.MINUTES
+        "hours", "hour", "h"            -> TimeUnit.HOURS
+        "days", "day", "d"              -> TimeUnit.DAYS
+        else                            -> TimeUnit.MINUTES
     }
 
     fun schedule(){
