@@ -7,6 +7,8 @@ softdepend: [WorldGuard, Factions, GriefPrevention]
 
 commands:
     blockregen:
+        aliases: [br]
+        description: The Kotlinized BlockRegenerator!
         usage: "/<command>"
 
 permissions:

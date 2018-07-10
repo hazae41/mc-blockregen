@@ -79,8 +79,6 @@ object BlockRegenerator{
 
         plugin.getCommand("blockregen").apply {
             executor = cmd
-            aliases = listOf("br")
-            description = "The Kotlinized BlockRegenerator!"
             tabCompleter = TabCompleter{ _, _, _, _ -> cmds }
         };
 
@@ -136,12 +134,12 @@ object BlockRegenerator{
                 if (!sender.hasPermission("blockregen.info"))
                     return@cmd noperm()
 
-                val blocks = get()
-                val placed = blocks.filter { e -> e.action == "placed" }.size
-                val broken = blocks.filter { e -> e.action == "broken" }.size
+                val entries = get()
 
-                "&6${blocks.size} blocks. ($placed placed, $broken broken)"
-                    .also { info(it); sender.msg(it) };
+                val placed = entries.filter { e -> e.action == "placed" }.size
+                val broken = entries.filter { e -> e.action == "broken" }.size
+
+                sender.msg("&6${entries.size} entries. ($placed placed, $broken broken)")
             }
             "clear", "c" -> {
 
@@ -149,7 +147,7 @@ object BlockRegenerator{
                     return@cmd noperm()
 
                 info("&6Blocks forcibly cleared by ${sender.name}");
-
+                sender.msg("&6Block forcibly cleared")
                 execute { emptyList() }
 
             }
@@ -356,39 +354,50 @@ object BlockRegenerator{
             val mintime = TimeUnit.MILLISECONDS
                 .convert(umintime.toLongOrNull() ?: return, unit(unit))
 
-            val blocks = get().take(max)
+            val entries = get().toMutableList()
 
             debug("Performing block regeneration.");
             val startTime = System.currentTimeMillis();
 
             val efficiency = config.getInt("percentage-efficiency")
 
-            for(e in blocks) {
+            for(i in 0..max){
 
-                val diff = System.currentTimeMillis() - e.time
-                if(diff <= mintime) break
+                val first = entries.firstOrNull() ?: break
+                // Get an initial action
+                val futures = entries.filter { it.loc == first.loc }
+                // Get its futures actions
+                entries.removeAll(futures)
+                // Do not process futures
+                val last = futures.last()
+                // Get the last action
+                val block = first.loc.block
 
-                execute { drop(1) }
+                val diff = System.currentTimeMillis() - last.time
+                if(diff <= mintime) continue
+                // Wait for another regen
+
+                execute{removeAll(futures.map { ser(it) }); this}
+                // Removes history of this block
 
                 debug(
-                "MATERIAL: ${e.mat.itemType.name}:${e.mat.data}," +
-                "X: ${e.loc.blockX}, " +
-                "Y: ${e.loc.blockY}, " +
-                "Z: ${e.loc.blockZ}, " +
-                "WORLD: ${e.loc.world.name}"
+                    "MATERIAL: ${first.mat.itemType.name}:${first.mat.data}," +
+                    "X: ${first.loc.blockX}, " +
+                    "Y: ${first.loc.blockY}, " +
+                    "Z: ${first.loc.blockZ}, " +
+                    "WORLD: ${first.loc.world.name}"
                 )
 
-                if(Random().nextInt(100) >= efficiency)
-                    continue;
+                if(Random().nextInt(100) >= efficiency) continue;
+                // Do nothing, keeping the history blank
 
-                when(e.action){
-                    "placed" -> e.loc.block.type = Material.AIR;
-                    "broken" -> e.loc.block.apply{
-                        type = e.mat.itemType
-                        data = e.mat.data
+                when(first.action){ // Restore
+                    "placed" -> block.type = Material.AIR
+                    "broken" -> block.apply{
+                        type = first.mat.itemType
+                        data = first.mat.data
                     }
                 }
-
             }
 
             val endTime = System.currentTimeMillis()
