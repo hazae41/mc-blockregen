@@ -9,8 +9,9 @@
 #   Click here to donate: http://dev.rhaz.fr/donate
 #
 
-debugging: false
-#I wouldn't change this as it makes console and in game chat very very spammy.
+paused: false
+# While this is true blocks will not be regenerated and any blocks broken during it
+# won't be restored by this plugin. But blocks broken before and after it will.
 
 regen-delay: "30 minutes"
 # Delay between each regeneration
@@ -26,18 +27,30 @@ max-blocks: 10
 percentage-efficiency: 90
 # X% of blocks will be restored, the rest will be ignored
 
-paused: false
-#While this is true blocks will not be regenerated and any blocks broken during it
-#won't be restored by this plugin. But blocks broken before and after it will.
+events:
+  broken:
+    enabled: true
+    # Should this plugin restore broken blocks?
+    ignore-creative: false
+    # Should NOT this plugin restore blocks broken by players in creative gamemode?
+  placed:
+    enabled: true
+    # Should this plugin restore placed blocks?
+    ignore-creative: false
+    # Should NOT this plugin restore blocks placed by players in creative gamemode?
+  burnt:
+    enabled: true
+    # Should this plugin restore burnt blocks?
+  exploded:
+    enabled: true
+    # Should this plugin restore explosions?
+    type: whitelist
+    # Whitelist: only restore explosions caused by these entities
+    # Blacklist: do not restore explosions caused by these entities
+    entities:
+    - creeper
+    - tnt
 
-restore-destroyed: true
-# Should this plugin restore destroyed blocks? (this includes explosions)
-
-restore-placed: true
-# Should this plugin restore placed blocks?
-
-ignore-creative: false
-# Blocks broken/placed by people in creative wont be restored if this is true.
 
 worlds:
   enabled: true
@@ -59,7 +72,7 @@ materials:
 
 worldguard:
   enabled: false
-  #If you do not have WorldGuard leave this disabled
+  # If you do not have WorldGuard leave this disabled
   type: whitelist
   # Whitelist: only restore blocks in these regions
   # Blacklist: do not restore blocks in these regions
@@ -68,6 +81,9 @@ worldguard:
 
 factions:
   enabled: false
+  name: "Factions"
+  # Plugin used
+  # Can be [Factions, SavageFactions, FactionsUUID]
   type: whitelist
   # Whitelist: only restore blocks in these factions
   # Blacklist: do not restore blocks in these factions
@@ -80,3 +96,7 @@ griefprevention:
   # Should this plugin restore admins claims?
   players-claims: true
   # Should this plugin restore players claims?
+
+extras:
+  debugging: false
+  # Debug this plugin

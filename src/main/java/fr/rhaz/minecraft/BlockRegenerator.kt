@@ -2,6 +2,8 @@
 
 package fr.rhaz.minecraft
 
+import com.massivecraft.factions.Board
+import com.massivecraft.factions.FLocation
 import com.massivecraft.factions.entity.BoardColl
 import com.massivecraft.massivecore.ps.PS
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
@@ -12,7 +14,9 @@ import org.bukkit.command.CommandExecutor
 import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
+import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockBurnEvent
@@ -65,17 +69,19 @@ object BlockRegenerator{
     fun init(plugin: BlockRegeneratorPlugin) {
         this.plugin = plugin;
 
-        config = loadConfig() ?:
+        config = load(configfile) ?:
             return info("Config could not be loaded");
 
-        data = loadData() ?:
+        data = load(datafile) ?:
             return info("Data could not be loaded")
 
         findDependencies()
 
-        plugin.getCommand("blockregen").let {
-            it.executor = cmd
-            it.tabCompleter = TabCompleter{
+        plugin.getCommand("blockregen").apply {
+            executor = cmd
+            aliases = listOf("br")
+            description = "The Kotlinized BlockRegenerator!"
+            tabCompleter = TabCompleter{
                 _, _, _, _ ->
                 listOf("force", "disable", "info", "clear", "debug", "reload");
             }
@@ -83,23 +89,28 @@ object BlockRegenerator{
 
         plugin.server.pluginManager.registerEvents(listener, plugin);
 
-        debug("BlockRegenerator has been Enabled.!");
         plugin.logger.donate(plugin.server)
 
         schedule()
     }
 
+
+
     val cmd = CommandExecutor { sender, command, s, args -> true.also cmd@{
 
-        val help = {
+        val noperm = {sender.msg("&cYou don't have permission to do that.")}
+
+        val help = help@{
+
+            if(!sender.hasPermission("blockregen.help"))
+                return@help noperm()
+
             sender.msg("&6BLOCK REGENERATOR &7v${plugin.description.version}&8:")
             listOf("force", "toggle", "info", "clear", "debug", "reload")
                 .forEach{ sender.msg("&7/br &6$it") }
         }
 
         if(args.isEmpty()) return@cmd help()
-
-        val noperm = {sender.msg("&cYou don't have permission to do that.")}
 
         when(args[0].toLowerCase()) {
             "force", "f" -> {
@@ -117,10 +128,10 @@ object BlockRegenerator{
                 if (!sender.hasPermission("blockregen.toggle"))
                     return@cmd noperm()
 
-                when(paused()){
-                    true -> paused(false).also {
+                paused = when(paused){
+                    true -> false.also {
                         sender.msg("&6Block regeneration enabled."); }
-                    false -> paused(true).also {
+                    false -> true.also {
                         sender.msg("&6Block regeneration disabled."); }
                 }
             }
@@ -151,11 +162,11 @@ object BlockRegenerator{
                 if (!sender.hasPermission("blockregen.debug"))
                     return@cmd noperm()
 
-                when(debugging()){
-                    true -> debugging(false).also{
-                        sender.msg("&6Runtime debugging disabled."); }
-                    false -> debugging(true).also {
-                        sender.msg("&6Runtime debugging enabled.") }
+                debugging = !debugging.also {
+                    sender.msg("&6Runtime debugging " + when(it){
+                        true -> "enabled"
+                        false -> "disabled"
+                    } + ".")
                 }
             }
             "reload", "r" -> {
@@ -163,7 +174,7 @@ object BlockRegenerator{
                 if (!sender.hasPermission("blockregen.reload"))
                     return@cmd noperm()
 
-                config = loadConfig() ?:
+                config = load(configfile) ?:
                     return@cmd sender.msg("&cCould not load config");
 
                 findDependencies()
@@ -172,41 +183,46 @@ object BlockRegenerator{
                 schedule();
                 sender.msg("&6Config reloaded")
             }
-            "help", "h" -> help();
             else -> help();
         }
     }}
 
-    fun debugging() = config.getBoolean("debugging")
-    fun debugging(enabled: Boolean) = config.apply{ set("debugging", enabled); save(configfile)}
+
+
+    var debugging
+        get() = config.getBoolean("extras.debugging")
+        set(value){ config.apply{ set("extras.debugging", value); save(configfile)} }
+
     fun info(msg: String) = plugin.logger.info(msg)
+
     fun debug(debug: String) {
-        if (!debugging()) return;
+        if (!debugging) return;
+
         info("[BR][D] $debug");
-        for (player in Bukkit.getOnlinePlayers())
-            if (player.hasPermission("blockregen.rd"))
-                player.msg("[BR][D] $debug")
+
+        Bukkit.getOnlinePlayers()
+            .filter { it.hasPermission("blockregen.rd")}
+            .forEach { it.msg("BR][D] $debug") }
     }
+
+
 
     lateinit var config: YamlConfiguration;
     val configfile by lazy {File(plugin.dataFolder, "config.yml")}
-    fun loadConfig(): YamlConfiguration? {
-        if (!configfile.parentFile.exists()) configfile.parentFile.mkdir();
-        if (!configfile.exists()) plugin.saveResource(configfile.name, false);
-        return YamlConfiguration.loadConfiguration(configfile) ?: null;
-    }
 
     lateinit var data: YamlConfiguration;
     val datafile by lazy {File(plugin.dataFolder, "data.yml")}
-    fun loadData(): YamlConfiguration? {
-        if (!datafile.parentFile.exists()) datafile.parentFile.mkdir();
-        if (!datafile.exists()) plugin.saveResource(datafile.name, false);
-        return YamlConfiguration.loadConfiguration(datafile) ?: null;
+
+    fun load(file: File): YamlConfiguration? {
+        if (!file.parentFile.exists()) file.parentFile.mkdir();
+        if (!file.exists()) plugin.saveResource(file.name, false);
+        return YamlConfiguration.loadConfiguration(file) ?: null;
     }
 
+
+
     var dependencies = mutableListOf<String>()
-    fun findDependencies(){
-        dependencies.clear()
+    fun findDependencies() = dependencies.clear().also{
         listOf("WorldGuard", "Factions", "GriefPrevention").forEach c@{
 
             if (!config.getBoolean("${it.toLowerCase()}.enabled"))
@@ -218,6 +234,8 @@ object BlockRegenerator{
             dependencies.add(it)
         }
     }
+
+
 
     fun restore(block: Block): Boolean = true.also{
 
@@ -280,11 +298,18 @@ object BlockRegenerator{
 
             val factions = config.getStringList("factions.factions")
 
-            val faction = BoardColl.get().getFactionAt(PS.valueOf(block))
+            val name = config.getString("factions.name").toLowerCase()
+
+            val faction = when(name){
+                "factions" -> BoardColl.get().getFactionAt(PS.valueOf(block)).name
+                "savagefactions", "factionsuuid" -> Board.getInstance().getFactionAt(FLocation(block)).tag
+                else -> return@factions info(
+                "factions.name is misconfigured, it should be Factions or SavageFactions")
+            }
 
             when(type){
-                "whitelist" -> if(!factions.contains(faction.name)) return false
-                "blacklist" -> if(factions.contains(faction.name)) return false
+                "whitelist" -> if(faction !in factions) return false
+                "blacklist" -> if(faction in factions) return false
                 else -> info("factions.type is misconfigured, it should be whitelist or blacklist")
             }
         }
@@ -307,6 +332,8 @@ object BlockRegenerator{
 
     }
 
+
+
     fun unit(unit: String): TimeUnit = when(unit){
         "seconds", "second", "sec", "s" -> TimeUnit.SECONDS
         "minutes", "minute", "min", "m" -> TimeUnit.MINUTES
@@ -318,15 +345,15 @@ object BlockRegenerator{
     fun schedule(){
         val s = config.getString("regen-delay").split(" ")
         val delay = TimeUnit.SECONDS.convert(s[0].toLongOrNull() ?: return, unit(s[1]))
-        regen = Regen();
+        regen = regen();
         regen.runTaskTimer(plugin, 0L, delay * 20L);
     }
 
-    lateinit var regen: Regen;
-    class Regen: BukkitRunnable(){
+    lateinit var regen: BukkitRunnable;
+    fun regen() = object: BukkitRunnable(){
         override fun run() {
 
-            if(paused()) return;
+            if(paused) return;
 
             val max = config.getInt("max-blocks").takeIf { it > 0 } ?: 100
 
@@ -375,41 +402,91 @@ object BlockRegenerator{
         }
     };
 
-    fun paused(): Boolean = config.getBoolean("paused")
-    fun paused(paused: Boolean) = config.apply { set("paused", paused); save(configfile)}
 
-    fun ignorecreative(): Boolean = config.getBoolean("ignore-creative")
+
+    var paused
+        get() = config.getBoolean("paused")
+        set(value){ config.apply {set("paused", value); save(configfile)} }
 
     var listener = object: Listener{
 
-        @EventHandler
+        fun creative(p: Player) = p.gameMode == GameMode.CREATIVE
+
+        val broken = object {
+            val enabled
+                get() = config.getBoolean("events.broken.enabled")
+            val ignorecreative
+                get() = config.getBoolean("events.broken.ignore-creative")
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
         fun onBlockBreak(e: BlockBreakEvent) {
 
-            if(paused()) return;
-            if (ignorecreative() && e.player.gameMode == GameMode.CREATIVE) return
-            if (!config.getBoolean("restore-destroyed")) return;
+            if(paused) return;
+            if(!broken.enabled) return
+            if(broken.ignorecreative && creative(e.player)) return
             if(!restore(e.block)) return
 
             val ser = ser(entry(e.block, "broken"))
             execute { add(ser); this }
         }
 
-        @EventHandler
+        val placed = object {
+            val enabled
+                get() = config.getBoolean("events.placed.enabled")
+            val ignorecreative
+                get() = config.getBoolean("events.placed.ignore-creative")
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        fun onBlockPlace(e: BlockPlaceEvent) {
+
+            if(paused) return;
+            if (!placed.enabled) return;
+            if(placed.ignorecreative && creative(e.player)) return
+            if(!restore(e.block)) return
+
+            val ser = ser(entry(e.block, "placed"))
+            execute { add(ser); this }
+        }
+
+        val burnt = object {
+            val enabled
+                get() = config.getBoolean("events.burnt.enabled")
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
         fun onBlockBurn(e: BlockBurnEvent) {
 
-            if(paused()) return;
-            if (!config.getBoolean("restore-destroyed")) return;
+            if(paused) return;
+            if (!burnt.enabled) return;
             if(!restore(e.block)) return
 
             val ser = ser(entry(e.block, "broken"))
             execute { add(ser); this }
         }
 
-        @EventHandler
+        val exploded = object {
+            val enabled
+                get() = config.getBoolean("events.exploded.enabled")
+            val type
+                get() = config.getString("events.exploded.type")
+            val entities
+                get() = config.getStringList("events.exploded.entities")
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
         fun onBlockExplode(e: EntityExplodeEvent) {
 
-            if(paused()) return;
-            if (!config.getBoolean("restore-destroyed")) return;
+            if(paused) return;
+            if (!exploded.enabled) return;
+
+            val entity = e.entityType.name.toLowerCase()
+            when(exploded.type){
+                "whitelist" -> if(entity !in exploded.entities) return
+                "blacklist" -> if(entity in exploded.entities) return
+                else -> info("events.exploded.type is misconfigured, it should be whitelist or blacklist")
+            }
 
             for(block in e.blockList()){
                 if(!restore(block)) continue
@@ -417,19 +494,9 @@ object BlockRegenerator{
                 execute { add(ser); this }
             }
         }
-
-        @EventHandler
-        fun onBlockPlace(e: BlockPlaceEvent) {
-
-            if(paused()) return;
-            if (ignorecreative() && e.player.gameMode == GameMode.CREATIVE) return
-            if (!config.getBoolean("restore-placed")) return;
-            if(!restore(e.block)) return
-
-            val ser = ser(entry(e.block, "placed"))
-            execute { add(ser); this }
-        }
     }
+
+
 
     data class Entry(val loc: Location, val time: Long, val action: String, val mat: MaterialData)
 
