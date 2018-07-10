@@ -304,7 +304,7 @@ object BlockRegenerator{
                 "factions" -> BoardColl.get().getFactionAt(PS.valueOf(block)).name
                 "savagefactions", "factionsuuid" -> Board.getInstance().getFactionAt(FLocation(block)).tag
                 else -> return@factions info(
-                "factions.name is misconfigured, it should be Factions or SavageFactions")
+                    "factions.name is misconfigured, it should be Factions, SavageFactions, or FactionsUUID")
             }
 
             when(type){
