@@ -17,6 +17,16 @@ regen-delay: "30 minutes"
 # Delay between each regeneration
 # Can be [seconds, minutes, hours, days]
 
+alert:
+  before: "&a[BlockRegen] Regeneration in 10 seconds..."
+  # Message displayed before the regeneration
+  # empty to disable
+  before-delay: "10 seconds"
+  # Can be [seconds, minutes, hours, days]
+  after: "&a[BlockRegen] Regeneration done!"
+  # Message displayed just after the regeneration
+  # empty to disable
+
 min-time: "2 days"
 # Minimum time after which a block is considered as "old" and will be regenerated
 # Can be [seconds, minutes, hours, days]
@@ -100,3 +110,7 @@ griefprevention:
 extras:
   debugging: false
   # Debug this plugin
+  force-log: false
+  # True: the plugin logs/saves the block in attempt to rollback it when it will match the filter
+  # False: the plugin simply ignores blocks that does not match the filter
+  # aka "If you want achieve rollback in now unclaimed areas"

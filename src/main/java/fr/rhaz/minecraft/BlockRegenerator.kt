@@ -188,6 +188,7 @@ object BlockRegenerator{
         set(value){ config.apply{ set("extras.debugging", value); save(configfile)} }
 
     fun info(msg: String) = plugin.logger.info(msg)
+    fun alert(msg: String) = plugin.server.onlinePlayers.forEach { it.msg(msg) }
 
     fun debug(debug: String) {
         if (!debugging) return;
@@ -276,7 +277,8 @@ object BlockRegenerator{
 
             val bregions = WorldGuardPlugin.inst()!!
                     .getRegionManager(block.world)
-                    .getApplicableRegions(block.location);
+                    .getApplicableRegions(block.location)
+                    .map { it.id }
 
             when(type){
                 "whitelist" -> if(pregions.intersect(bregions).isEmpty()) return false
@@ -339,7 +341,17 @@ object BlockRegenerator{
     fun schedule(){
         val (udelay, unit) = config.getString("regen-delay").split(" ")
         val delay = TimeUnit.SECONDS.convert(udelay.toLongOrNull() ?: return, unit(unit))
-        regen = regen().apply{runTaskTimer(plugin, 0L, delay * 20L)}
+
+        val (uadelay, aunit) = config.getString("alert.before-delay").split(" ")
+        val adelay = TimeUnit.SECONDS.convert(uadelay.toLongOrNull() ?: return, unit(aunit))
+
+        config.getString("alert.before").also {
+            if(adelay > delay) return@also info("Error: alert.before-delay is higher than regen-delay")
+            if(it.isNullOrEmpty()) return@also
+            plugin.server.scheduler.runTaskTimer(plugin, {alert(it)}, delay * 20L, delay * 20L)
+        }
+
+        regen = regen().apply{runTaskTimer(plugin, (delay + adelay) * 20L, delay * 20L)}
     }
 
     lateinit var regen: BukkitRunnable;
@@ -373,9 +385,12 @@ object BlockRegenerator{
                 // Get the last action
                 val block = first.loc.block
 
+                if(!restore(block)) continue
+                // Wait for the block to match the filter
+
                 val diff = System.currentTimeMillis() - last.time
                 if(diff <= mintime) continue
-                // Wait for another regen
+                // Wait for the block to be old enough
 
                 execute{removeAll(futures.map { ser(it) }); this}
                 // Removes history of this block
@@ -402,7 +417,9 @@ object BlockRegenerator{
 
             val endTime = System.currentTimeMillis()
             debug("Regeneration complete, took ${startTime - endTime} ms.")
-
+            config.getString("alert.after").also {
+                if(!it.isNullOrEmpty()) alert(it)
+            }
         }
     };
 
@@ -415,6 +432,9 @@ object BlockRegenerator{
     val listener = object: Listener{
 
         fun creative(p: Player) = p.gameMode == GameMode.CREATIVE
+
+        val forcelog
+            get() = config.getBoolean("extras.force-log")
 
         val broken = object {
             val enabled
@@ -429,7 +449,7 @@ object BlockRegenerator{
             if(paused) return;
             if(!broken.enabled) return
             if(broken.ignorecreative && creative(e.player)) return
-            if(!restore(e.block)) return
+            if(!forcelog && !restore(e.block)) return
 
             val ser = ser(entry(e.block, "broken"))
             execute { add(ser); this }
@@ -448,7 +468,7 @@ object BlockRegenerator{
             if(paused) return;
             if (!placed.enabled) return;
             if(placed.ignorecreative && creative(e.player)) return
-            if(!restore(e.block)) return
+            if(!forcelog && !restore(e.block)) return
 
             val ser = ser(entry(e.block, "placed"))
             execute { add(ser); this }
@@ -464,7 +484,7 @@ object BlockRegenerator{
 
             if(paused) return;
             if (!burnt.enabled) return;
-            if(!restore(e.block)) return
+            if(!forcelog && !restore(e.block)) return
 
             val ser = ser(entry(e.block, "broken"))
             execute { add(ser); this }
@@ -492,8 +512,9 @@ object BlockRegenerator{
                 else -> info("events.exploded.type is misconfigured, it should be whitelist or blacklist")
             }
 
+            val forcelog = forcelog
             for(block in e.blockList()){
-                if(!restore(block)) continue
+                if(!forcelog && !restore(block)) continue
                 val ser = ser(entry(block, "broken"))
                 execute { add(ser); this }
             }
