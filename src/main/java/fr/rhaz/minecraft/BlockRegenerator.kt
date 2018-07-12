@@ -360,13 +360,20 @@ object BlockRegenerator{
 
             if(paused) return;
 
-            val max = config.getInt("max-blocks").takeIf { it > 0 } ?: 100
-
             val (umintime, unit) = config.getString("min-time").split(" ")
             val mintime = TimeUnit.MILLISECONDS
                 .convert(umintime.toLongOrNull() ?: return, unit(unit))
 
             val entries = get().toMutableList()
+
+            val maxblocks = config.getString("max-blocks")
+            val max = if(maxblocks.endsWith("%")){
+                val percentage = maxblocks.dropLast(1).toIntOrNull()
+                        ?.takeIf { it in 0..100 }
+                        ?: return info("Err: 0x163634")
+                Math.floorDiv(percentage * entries.size, 100)
+            } else maxblocks.toIntOrNull()
+                    ?: return info("Err: 0x163635")
 
             debug("Performing block regeneration.");
             val startTime = System.currentTimeMillis();

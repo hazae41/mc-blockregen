@@ -31,8 +31,10 @@ min-time: "2 days"
 # Minimum time after which a block is considered as "old" and will be regenerated
 # Can be [seconds, minutes, hours, days]
 
-max-blocks: 10
+max-blocks: "10"
 # Number of blocks restored at each regeneration
+# Can be of the format "X%" if you want it to be proportional to the amount of blocks saved
+# Can be of the format "X" if you want it to be static
 
 percentage-efficiency: 90
 # X% of blocks will be restored, the rest will be ignored
