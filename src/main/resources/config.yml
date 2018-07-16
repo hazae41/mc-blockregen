@@ -39,6 +39,16 @@ max-blocks: "10"
 percentage-efficiency: 90
 # X% of blocks will be restored, the rest will be ignored
 
+storage:
+  type: "sqlite"
+  # Can be [yaml, sqlite, mysql]
+  mysql: # In case of mysql
+    host: localhost:3306
+    database: blockregen
+    user: admin
+    password: pass
+
+
 events:
   broken:
     enabled: true

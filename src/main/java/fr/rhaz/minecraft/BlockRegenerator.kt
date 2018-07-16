@@ -8,6 +8,9 @@ import com.massivecraft.factions.entity.BoardColl
 import com.massivecraft.massivecore.ps.PS
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import me.ryanhamshire.GriefPrevention.GriefPrevention
+import net.md_5.bungee.api.ChatColor
+import net.md_5.bungee.api.chat.ClickEvent
+import net.md_5.bungee.api.chat.TextComponent
 import org.bukkit.*
 import org.bukkit.block.Block
 import org.bukkit.command.CommandExecutor
@@ -25,8 +28,12 @@ import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.material.MaterialData
 import org.bukkit.plugin.java.JavaPlugin
 import org.bukkit.scheduler.BukkitRunnable
+import org.jetbrains.exposed.sql.*
+import org.jetbrains.exposed.sql.SchemaUtils.create
+import org.jetbrains.exposed.sql.transactions.transaction
 import java.io.File
-import java.util.*
+import java.sql.Connection
+import java.util.Random
 import java.util.concurrent.TimeUnit
 import java.util.logging.Logger
 
@@ -35,6 +42,7 @@ class BlockRegeneratorPlugin: JavaPlugin(), Listener{
     override fun onEnable() = BlockRegenerator.init(this)
 }
 
+fun text(string: String) = TextComponent(string.replace("&", "§"))
 fun CommandSender.msg(msg: String) = sendMessage(msg.replace("&", "§"))
 
 fun Logger.donate(server: Server) {
@@ -72,8 +80,12 @@ object BlockRegenerator{
         config = load(configfile) ?:
             return info("Config could not be loaded");
 
-        data = load(datafile) ?:
-            return info("Data could not be loaded")
+        when(config.getString("storage.type")){
+            "yaml" -> data = load(datafile) ?:
+                    return info("YAML data could not be loaded")
+            "sqlite", "mysql" -> db = database() ?:
+                    return info("SQL database could not be loaded")
+        }
 
         findDependencies()
 
@@ -90,7 +102,7 @@ object BlockRegenerator{
     }
 
 
-    val cmds = listOf("force", "disable", "info", "clear", "debug", "reload");
+    val cmds = listOf("force", "disable", "info", "clear", "debug", "reload", "donate");
     val cmd = CommandExecutor { sender, command, label, args -> true.also cmd@{
 
         val noperm = {sender.msg("&cYou don't have permission to do that.")}
@@ -148,7 +160,7 @@ object BlockRegenerator{
 
                 info("&6Blocks forcibly cleared by ${sender.name}");
                 sender.msg("&6Block forcibly cleared")
-                execute { emptyList() }
+                execute { clear() }
 
             }
             "debug", "d" -> {
@@ -171,11 +183,32 @@ object BlockRegenerator{
                 config = load(configfile) ?:
                     return@cmd sender.msg("&cCould not load config");
 
+                when(config.getString("storage.type")){
+                    "yaml" -> data = load(datafile) ?:
+                            return@cmd sender.msg("&cYAML data could not be loaded")
+                    "sqlite", "mysql" -> db = database() ?:
+                            return@cmd sender.msg("&cSQL database could not be loaded")
+                }
+
                 findDependencies()
 
                 Bukkit.getScheduler().cancelTasks(plugin)
                 schedule();
                 sender.msg("&6Config reloaded")
+            }
+            "donate" -> """
+                |  If you like my softwares or you just want to support me,
+                |  I'd enjoy donations.
+                |  By donating, you're going to encourage me to continue
+                |  developing quality softwares.
+                |  And you'll be added to the donators list!
+                |  Click here to donate: http://dev.rhaz.fr/donate
+                """.trimMargin().split("\n").map {
+                    text(it).apply {
+                        color = ChatColor.LIGHT_PURPLE
+                        clickEvent = ClickEvent(ClickEvent.Action.OPEN_URL, "http://dev.rhaz.fr/donate")
+                    }
+                }.forEach { sender.spigot().sendMessage(it)
             }
             else -> help();
         }
@@ -399,7 +432,7 @@ object BlockRegenerator{
                 if(diff <= mintime) continue
                 // Wait for the block to be old enough
 
-                execute{removeAll(futures.map { ser(it) }); this}
+                execute{ removeAll(futures) }
                 // Removes history of this block
 
                 debug(
@@ -458,8 +491,7 @@ object BlockRegenerator{
             if(broken.ignorecreative && creative(e.player)) return
             if(!forcelog && !restore(e.block)) return
 
-            val ser = ser(entry(e.block, "broken"))
-            execute { add(ser); this }
+            execute { add(entry(e.block, "broken")) }
         }
 
         val placed = object {
@@ -477,8 +509,7 @@ object BlockRegenerator{
             if(placed.ignorecreative && creative(e.player)) return
             if(!forcelog && !restore(e.block)) return
 
-            val ser = ser(entry(e.block, "placed"))
-            execute { add(ser); this }
+            execute { add(entry(e.block, "placed"))}
         }
 
         val burnt = object {
@@ -493,8 +524,7 @@ object BlockRegenerator{
             if (!burnt.enabled) return;
             if(!forcelog && !restore(e.block)) return
 
-            val ser = ser(entry(e.block, "broken"))
-            execute { add(ser); this }
+            execute { add(entry(e.block, "broken"))}
         }
 
         val exploded = object {
@@ -522,8 +552,7 @@ object BlockRegenerator{
             val forcelog = forcelog
             for(block in e.blockList()){
                 if(!forcelog && !restore(block)) continue
-                val ser = ser(entry(block, "broken"))
-                execute { add(ser); this }
+                execute { add(entry(block, "broken"))}
             }
         }
     }
@@ -569,11 +598,58 @@ object BlockRegenerator{
         return Entry(loc, time = time, action = action, mat = mat)
     }
 
-    fun execute(lambda: MutableList<String>.() -> List<String>) = data.apply {
-        val list = getStringList("data")
-        set("data", list.let(lambda))
-        save(datafile)
+
+
+    object Entries: Table(){
+        val entry = varchar("entry", length = 50)
     }
 
-    fun get() = data.getStringList("data").map { e -> deser(e) }
+    var db: Database? = null
+
+    fun database() = when(config.getString("storage.type")){
+        "sqlite" -> Database.connect("jdbc:sqlite:plugins/BlockRegenerator/data.db", "org.sqlite.JDBC")
+        "mysql" -> {
+            val host = config.getString("storage.mysql.host")
+            val db = config.getString("storage.mysql.database")
+            val user = config.getString("storage.mysql.user")
+            val password = config.getString("storage.mysql.password")
+            Database.connect(
+                "jdbc:mysql://$host/$db",
+                driver = "com.mysql.jdbc.Driver",
+                user = user,
+                password = password)
+        }
+        else -> null
+    }
+
+
+
+
+    fun get(): MutableList<Entry> = when(config.getString("storage.type")){
+        "yaml" -> data.getStringList("data").map { e -> deser(e) }
+        "mysql", "sqlite" -> transaction(Connection.TRANSACTION_SERIALIZABLE, 2, db) {
+            create (Entries)
+            Entries.selectAll().map { deser(it[Entries.entry]) }
+        }
+        else -> emptyList()
+    }.toMutableList()
+
+    fun save(list: List<Entry>) {
+        when(config.getString("storage.type")){
+            "yaml" -> data.apply{
+                set("data", list.map{ser(it)})
+                save(datafile)
+            }
+            "sqlite", "mysql" -> transaction(Connection.TRANSACTION_SERIALIZABLE, 2, db) {
+                create (Entries)
+                Entries.deleteAll()
+                Entries.batchInsert(list.map{ser(it)})
+                    {this[Entries.entry] = it}
+            }
+        }
+    }
+
+    fun execute(lambda: MutableList<Entry>.() -> Unit) {
+        save(get().apply(lambda))
+    }
 }
