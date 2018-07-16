@@ -627,10 +627,12 @@ object BlockRegenerator{
 
     fun get(): MutableList<Entry> = when(config.getString("storage.type")){
         "yaml" -> data.getStringList("data").map { e -> deser(e) }
-        "mysql", "sqlite" -> transaction(Connection.TRANSACTION_SERIALIZABLE, 2, db) {
-            create (Entries)
-            Entries.selectAll().map { deser(it[Entries.entry]) }
-        }
+        "mysql", "sqlite" -> try{
+            transaction(Connection.TRANSACTION_SERIALIZABLE, 1, db) {
+                create (Entries)
+                Entries.selectAll().map { deser(it[Entries.entry]) }
+            }
+        } catch (e: Exception){info("Could not connect to SQL database!"); emptyList<Entry>()}
         else -> emptyList()
     }.toMutableList()
 
@@ -640,12 +642,14 @@ object BlockRegenerator{
                 set("data", list.map{ser(it)})
                 save(datafile)
             }
-            "sqlite", "mysql" -> transaction(Connection.TRANSACTION_SERIALIZABLE, 2, db) {
-                create (Entries)
-                Entries.deleteAll()
-                Entries.batchInsert(list.map{ser(it)})
+            "sqlite", "mysql" -> try{
+                transaction(Connection.TRANSACTION_SERIALIZABLE, 1, db) {
+                    create (Entries)
+                    Entries.deleteAll()
+                    Entries.batchInsert(list.map{ser(it)})
                     {this[Entries.entry] = it}
-            }
+                }
+            } catch (e: Exception){info("Could not connect to SQL database!"); emptyList<Entry>()}
         }
     }
 
