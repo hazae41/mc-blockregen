@@ -2,10 +2,15 @@
 
 package fr.rhaz.minecraft
 
+import com.bekvon.bukkit.residence.Residence
 import com.massivecraft.factions.Board
 import com.massivecraft.factions.FLocation
 import com.massivecraft.factions.entity.BoardColl
 import com.massivecraft.massivecore.ps.PS
+import com.palmergames.bukkit.towny.Towny
+import com.palmergames.bukkit.towny.`object`.Town
+import com.palmergames.bukkit.towny.`object`.TownBlock
+import com.palmergames.bukkit.towny.`object`.TownyWorld
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import me.ryanhamshire.GriefPrevention.GriefPrevention
 import net.md_5.bungee.api.ChatColor
@@ -251,7 +256,7 @@ object BlockRegenerator{
 
     var dependencies = mutableListOf<String>()
     fun findDependencies() = dependencies.clear().also{
-        listOf("WorldGuard", "Factions", "GriefPrevention").forEach c@{
+        listOf("WorldGuard", "Factions", "GriefPrevention", "Residence", "Towny").forEach c@{
 
             if (!config.getBoolean("${it.toLowerCase()}.enabled"))
                 return@c;
@@ -357,6 +362,43 @@ object BlockRegenerator{
                 false -> if(!restoreplayers) return false
             }
 
+        }
+
+        run residence@{
+            if("Residence" !in dependencies) return@residence
+
+            val type = config.getString("residence.type")
+
+            val list = config.getStringList("residence.residences")
+            val res = Residence.getInstance()?.residenceManager?.getByLoc(block.location)?.name
+                ?: return@residence
+
+            when(type){
+                "whitelist" -> if(res !in list) return false
+                "blacklist" -> if(res in list) return false
+                else -> info("residence.type is misconfigured, it should be whitelist or blacklist")
+            }
+        }
+
+        run towny@{
+            if("Towny" !in dependencies) return@towny
+
+            val type = config.getString("towny.type")
+
+            val tblock = TownBlock(block.x, block.z, TownyWorld(block.world.name))
+
+            val list = config.getStringList("towny.towns")
+
+            val towns = Towny.plugin?.townyUniverse?.townsMap?.values
+                ?.filter { it.hasTownBlock(tblock) }
+                ?.map { it.tag }
+                ?: return@towny
+
+            when(type){
+                "whitelist" -> if(towns.intersect(list).isEmpty()) return false
+                "blacklist" -> if(towns.intersect(list).any()) return false
+                else -> info("towny.type is misconfigured, it should be whitelist or blacklist")
+            }
         }
 
     }

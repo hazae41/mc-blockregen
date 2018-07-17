@@ -3,7 +3,7 @@ version: ${project.version}
 main: fr.rhaz.minecraft.BlockRegeneratorPlugin
 author: Hazae41
 depend: [Kotlin4MC]
-softdepend: [WorldGuard, Factions, GriefPrevention]
+softdepend: [WorldGuard, Factions, GriefPrevention, Residence, Towny]
 
 commands:
     blockregen:

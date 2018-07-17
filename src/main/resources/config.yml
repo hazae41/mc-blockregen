@@ -48,7 +48,6 @@ storage:
     user: admin
     password: pass
 
-
 events:
   broken:
     enabled: true
@@ -118,6 +117,22 @@ griefprevention:
   # Should this plugin restore admins claims?
   players-claims: true
   # Should this plugin restore players claims?
+
+residence:
+  enabled: true
+  type: blacklist
+  # Whitelist: only restore blocks in these residences
+  # Blacklist: do not restore blocks in these residences
+  residences:
+  - "residence_name"
+
+towny:
+  enabled: true
+  type: blacklist
+  # Whitelist: only restore blocks in these towns
+  # Blacklist: do not restore blocks in these towns
+  towns:
+  - "ExampleCity"
 
 extras:
   debugging: false
