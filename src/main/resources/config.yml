@@ -119,7 +119,7 @@ griefprevention:
   # Should this plugin restore players claims?
 
 residence:
-  enabled: true
+  enabled: false
   type: blacklist
   # Whitelist: only restore blocks in these residences
   # Blacklist: do not restore blocks in these residences
@@ -127,7 +127,7 @@ residence:
   - "residence_name"
 
 towny:
-  enabled: true
+  enabled: false
   type: blacklist
   # Whitelist: only restore blocks in these towns
   # Blacklist: do not restore blocks in these towns
