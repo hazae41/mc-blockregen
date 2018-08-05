@@ -1,0 +1,145 @@
+#     __         _    ____  __   ___
+#    |__) |__|  /_\   ___/ |  \ |__  \  /
+#	 |  \ |  | /   \ /___  |__/ |___  \/
+#
+#   If you like my softwares or you just want to support me, I'd enjoy donations.
+#   By donating, you're going to encourage me to continue developing quality softwares.
+#   And you'll be added to the donators list!
+#
+#   Click here to donate: http://dev.rhaz.fr/donate
+#
+
+paused: false
+# While this is true blocks will not be regenerated and any blocks broken during it
+# won't be restored by this plugin. But blocks broken before and after it will.
+
+regen-delay: "30 minutes"
+# Delay between each regeneration
+# Can be [seconds, minutes, hours, days]
+
+alert:
+  before: "&a[BlockRegen] Regeneration in 10 seconds..."
+  # Message displayed before the regeneration
+  # empty to disable
+  before-delay: "10 seconds"
+  # Can be [seconds, minutes, hours, days]
+  after: "&a[BlockRegen] Regeneration done!"
+  # Message displayed just after the regeneration
+  # empty to disable
+
+min-time: "2 days"
+# Minimum time after which a block is considered as "old" and will be regenerated
+# Can be [seconds, minutes, hours, days]
+
+max-blocks: "10"
+# Number of blocks restored at each regeneration
+# Can be of the format "X%" if you want it to be proportional to the amount of blocks saved
+# Can be of the format "X" if you want it to be static
+
+percentage-efficiency: 90
+# X% of blocks will be restored, the rest will be ignored
+
+storage:
+  type: "sqlite"
+  # Can be [yaml, sqlite, mysql]
+  mysql: # In case of mysql
+    host: localhost:3306
+    database: blockregen
+    user: admin
+    password: pass
+
+events:
+  broken:
+    enabled: true
+    # Should this plugin restore broken blocks?
+    ignore-creative: false
+    # Should NOT this plugin restore blocks broken by players in creative gamemode?
+  placed:
+    enabled: true
+    # Should this plugin restore placed blocks?
+    ignore-creative: false
+    # Should NOT this plugin restore blocks placed by players in creative gamemode?
+  burnt:
+    enabled: true
+    # Should this plugin restore burnt blocks?
+  exploded:
+    enabled: true
+    # Should this plugin restore explosions?
+    type: whitelist
+    # Whitelist: only restore explosions caused by these entities
+    # Blacklist: do not restore explosions caused by these entities
+    entities:
+    - creeper
+    - tnt
+
+
+worlds:
+  enabled: true
+  type: whitelist
+  # Whitelist: only restore blocks in these worlds
+  # Blacklist: do not restore blocks in these worlds
+  worlds:
+  - world
+  - world_nether
+  - world_the_end
+
+materials:
+  enabled: true
+  type: blacklist
+  # Whitelist: only restore blocks materials in these materials
+  # Blacklist: do not restore blocks materials in these materials
+  materials:
+  - "BLOCK_NAME:ID" # (example: STONE:0 would be just normal stone)
+
+worldguard:
+  enabled: false
+  # If you do not have WorldGuard leave this disabled
+  type: whitelist
+  # Whitelist: only restore blocks in these regions
+  # Blacklist: do not restore blocks in these regions
+  regions:
+  - "region_name"
+
+factions:
+  enabled: false
+  name: "Factions"
+  # Plugin used
+  # Can be [Factions, SavageFactions, FactionsUUID]
+  type: whitelist
+  # Whitelist: only restore blocks in these factions
+  # Blacklist: do not restore blocks in these factions
+  factions:
+  - "Wilderness"
+
+griefprevention:
+  enabled: false
+  admins-claims: false
+  # Should this plugin restore admins claims?
+  players-claims: true
+  # Should this plugin restore players claims?
+
+residence:
+  enabled: false
+  type: blacklist
+  # Whitelist: only restore blocks in these residences
+  # Blacklist: do not restore blocks in these residences
+  residences:
+  - "residence_name"
+
+towny:
+  enabled: false
+  type: blacklist
+  # Whitelist: only restore blocks in these towns
+  # Blacklist: do not restore blocks in these towns
+  towns:
+  - "ExampleCity"
+
+extras:
+  debugging: false
+  # Debug this plugin
+  force-log: false
+  # True: the plugin logs/saves the block in attempt to rollback it when it will match the filter
+  # False: the plugin simply ignores blocks that does not match the filter
+  # aka "If you want achieve rollback in now unclaimed areas"
+
+
