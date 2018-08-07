@@ -1,7 +1,8 @@
 name: @name@
 version: @version@
 description: @desc@
-main: fr.rhaz.minecraft.BlockRegeneratorPlugin
+main: fr.rhaz.minecraft.blockregenerator.BlockRegeneratorPlugin
+api-version: 1.13
 author: Hazae41
 depend: [Kotlin4MC, Exposed4MC]
 softdepend: [WorldGuard, Factions, LegacyFactions, GriefPrevention, Residence, Towny]

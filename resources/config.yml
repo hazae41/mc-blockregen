@@ -89,7 +89,7 @@ materials:
   # Whitelist: only restore blocks materials in these materials
   # Blacklist: do not restore blocks materials in these materials
   materials:
-  - "BLOCK_NAME:ID" # (example: STONE:0 would be just normal stone)
+  - "BLOCK_NAME" # (example: STONE)
 
 worldguard:
   enabled: false

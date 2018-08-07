@@ -1,6 +1,6 @@
 @file:Suppress("UNUSED_ANONYMOUS_PARAMETER", "DEPRECATION", "UNUSED_DESTRUCTURED_PARAMETER_ENTRY")
 
-package fr.rhaz.minecraft
+package fr.rhaz.minecraft.blockregenerator
 
 import com.bekvon.bukkit.residence.Residence
 import com.massivecraft.factions.Board
@@ -12,19 +12,19 @@ import com.palmergames.bukkit.towny.`object`.TownBlock
 import com.palmergames.bukkit.towny.`object`.TownyWorld
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import me.ryanhamshire.GriefPrevention.GriefPrevention
-import net.md_5.bungee.api.ChatColor
+import net.md_5.bungee.api.ChatColor.AQUA
+import net.md_5.bungee.api.ChatColor.LIGHT_PURPLE
 import net.md_5.bungee.api.chat.ClickEvent
-import net.md_5.bungee.api.chat.TextComponent
 import net.redstoneore.legacyfactions.locality.Locality
-import net.redstoneore.legacyfactions.entity.Board as LegacyBoard
 import org.bukkit.Bukkit
 import org.bukkit.GameMode
 import org.bukkit.Location
+import org.bukkit.Material
 import org.bukkit.Material.AIR
-import org.bukkit.Server
+import org.bukkit.Material.getMaterial
 import org.bukkit.block.Block
+import org.bukkit.block.data.BlockData
 import org.bukkit.command.CommandExecutor
-import org.bukkit.command.CommandSender
 import org.bukkit.command.TabCompleter
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.entity.Player
@@ -45,50 +45,20 @@ import java.io.File
 import java.sql.Connection
 import java.util.Random
 import java.util.concurrent.TimeUnit
-import java.util.logging.Logger
+import net.redstoneore.legacyfactions.entity.Board as LegacyBoard
 
+lateinit var BlockRegenerator: BlockRegeneratorPlugin
+class BlockRegeneratorPlugin: JavaPlugin() {
 
-class BlockRegeneratorPlugin: JavaPlugin(), Listener{
-    override fun onEnable() = BlockRegenerator.init(this)
-}
+    init {
+        BlockRegenerator = this
+        File(".noads").delete()
+    }
 
-fun text(string: String) = TextComponent(string.replace("&", "§"))
-fun CommandSender.msg(msg: String) = sendMessage(msg.replace("&", "§"))
-
-fun Logger.donate(server: Server) {
-    val file = File(".noads")
-    if(file.exists()) return
-    val plugins = server.pluginManager.plugins
-            .filter { plugin -> listOf("Hazae41", "RHazDev").intersect(plugin.description.authors).any() }
-            .map { plugin -> plugin.description.name }
-    this.info("""
-    |
-    |    __         _    ____  __   ___
-    |   |__) |__|  /_\   ___/ |  \ |__  \  /
-    |   |  \ |  | /   \ /___  |__/ |___  \/
-    |
-    |   It seems you use $plugins
-    |
-    |   If you like my softwares or you just want to support me, I'd enjoy donations.
-    |   By donating, you're going to encourage me to continue developing quality softwares.
-    |   And you'll be added to the donators list!
-    |
-    |   Click here to donate: http://dev.rhaz.fr/donate
-    |
-    """.trimMargin("|"))
-    file.createNewFile()
-    Thread{ Thread.sleep(2000); file.delete()}.start()
-}
-
-object BlockRegenerator{
-
-    lateinit var plugin: BlockRegeneratorPlugin;
-    fun init(): Boolean = BlockRegenerator::plugin.isInitialized;
-    fun init(plugin: BlockRegeneratorPlugin) {
-        this.plugin = plugin;
+    override fun onEnable() {
 
         config = load(configfile) ?:
-            return info("Config could not be loaded");
+                return info("Config could not be loaded");
 
         when(config.getString("storage.type")){
             "yaml" -> data = load(datafile) ?:
@@ -99,20 +69,21 @@ object BlockRegenerator{
 
         findDependencies()
 
-        plugin.getCommand("blockregen").apply {
+        getCommand("blockregen").apply {
             executor = cmd
             tabCompleter = TabCompleter{ _, _, _, _ -> cmds }
         };
 
-        plugin.server.pluginManager.registerEvents(listener, plugin);
+        server.pluginManager.registerEvents(listener, this);
 
-        plugin.logger.donate(plugin.server)
+        donate(AQUA)
+        update(58011, LIGHT_PURPLE)
 
         schedule()
     }
 
 
-    val cmds = listOf("force", "disable", "info", "clear", "debug", "reload", "donate");
+    val cmds = listOf("force", "toggle", "info", "clear", "debug", "reload", "donate");
     val cmd = CommandExecutor { sender, command, label, args -> true.also cmd@{
 
         val noperm = {sender.msg("&cYou don't have permission to do that.")}
@@ -122,7 +93,7 @@ object BlockRegenerator{
             if(!sender.hasPermission("blockregen.help"))
                 return@help noperm()
 
-            sender.msg("&6BLOCK REGENERATOR &7v${plugin.description.version}&8:")
+            sender.msg("&6BLOCK REGENERATOR &7v${description.version}&8:")
             cmds.forEach{ sender.msg("&7/$label &6$it") }
         }
 
@@ -202,7 +173,7 @@ object BlockRegenerator{
 
                 findDependencies()
 
-                Bukkit.getScheduler().cancelTasks(plugin)
+                Bukkit.getScheduler().cancelTasks(this)
                 schedule();
                 sender.msg("&6Config reloaded")
             }
@@ -215,7 +186,7 @@ object BlockRegenerator{
                 |  Click here to donate: http://dev.rhaz.fr/donate
                 """.trimMargin().split("\n").map {
                     text(it).apply {
-                        color = ChatColor.LIGHT_PURPLE
+                        color = LIGHT_PURPLE
                         clickEvent = ClickEvent(ClickEvent.Action.OPEN_URL, "http://dev.rhaz.fr/donate")
                     }
                 }.forEach { sender.spigot().sendMessage(it)
@@ -230,8 +201,8 @@ object BlockRegenerator{
         get() = config.getBoolean("extras.debugging")
         set(value){ config.apply{ set("extras.debugging", value); save(configfile)} }
 
-    fun info(msg: String) = plugin.logger.info(msg)
-    fun alert(msg: String) = plugin.server.onlinePlayers.forEach { it.msg(msg) }
+    fun info(msg: String) = logger.info(msg)
+    fun alert(msg: String) = server.onlinePlayers.forEach{it.msg(msg)}
 
     fun debug(debug: String) {
         if (!debugging) return;
@@ -246,14 +217,14 @@ object BlockRegenerator{
 
 
     lateinit var config: YamlConfiguration;
-    val configfile by lazy {File(plugin.dataFolder, "config.yml")}
+    val configfile by lazy{ File(dataFolder, "config.yml") }
 
     lateinit var data: YamlConfiguration;
-    val datafile by lazy {File(plugin.dataFolder, "resources/data.yml")}
+    val datafile by lazy{ File(dataFolder, "resources/data.yml") }
 
     fun load(file: File): YamlConfiguration? {
         if (!file.parentFile.exists()) file.parentFile.mkdir();
-        if (!file.exists()) plugin.saveResource(file.name, false);
+        if (!file.exists()) saveResource(file.name, false);
         return YamlConfiguration.loadConfiguration(file) ?: null;
     }
 
@@ -271,7 +242,7 @@ object BlockRegenerator{
             if (!config.getBoolean("$cname.enabled"))
                 return@c;
 
-            plugin.server?.pluginManager?.getPlugin(it)
+            server?.pluginManager?.getPlugin(it)
                     ?: return@c info("Could not load $it")
 
             dependencies.add(it)
@@ -290,11 +261,11 @@ object BlockRegenerator{
 
             val materials = config.getStringList("materials.materials")
 
-            val material = "${block.type}:${block.data}"
+            val material = block.type.name
 
             when(type){
-                "whitelist" -> if(!materials.contains(material)) return false
-                "blacklist" -> if(materials.contains(material)) return false
+                "whitelist" -> if(material !in materials) return false
+                "blacklist" -> if(material in materials) return false
                 else -> info("materials.type is misconfigured, it should be whitelist or blacklist")
             }
         }
@@ -336,13 +307,19 @@ object BlockRegenerator{
         }
 
         run factions@{
-            if("Factions" !in dependencies) return@factions
 
             val type = config.getString("factions.type")
 
             val factions = config.getStringList("factions.factions")
 
             val name = config.getString("factions.name").toLowerCase()
+
+            when(name){
+                "factions", "savagefactions", "factionsuuid" ->
+                    if("Factions" !in dependencies) return@factions
+                "legacyfactions" ->
+                    if("LegacyFactions" !in dependencies) return@factions
+            }
 
             val faction = when(name){
                 "factions" -> BoardColl.get().getFactionAt(PS.valueOf(block)).name
@@ -435,10 +412,10 @@ object BlockRegenerator{
         config.getString("alert.before").also {
             if(adelay > delay) return@also info("Error: alert.before-delay is higher than regen-delay")
             if(it.isNullOrEmpty()) return@also
-            plugin.server.scheduler.runTaskTimer(plugin, {alert(it)}, delay * 20L, delay * 20L)
+            server.scheduler.runTaskTimer(this, {alert(it)}, delay * 20L, delay * 20L)
         }
 
-        regen = regen().apply{runTaskTimer(plugin, (delay + adelay) * 20L, delay * 20L)}
+        regen = regen().apply{runTaskTimer(BlockRegenerator, (delay + adelay) * 20L, delay * 20L)}
     }
 
     lateinit var regen: BukkitRunnable;
@@ -490,7 +467,7 @@ object BlockRegenerator{
                 // Removes history of this block
 
                 debug(
-                    "MATERIAL: ${first.mat.itemType.name}:${first.mat.data}," +
+                    "MATERIAL: ${first.mat.name}:${first.mat.data}," +
                     "X: ${first.loc.blockX}, " +
                     "Y: ${first.loc.blockY}, " +
                     "Z: ${first.loc.blockZ}, " +
@@ -503,8 +480,8 @@ object BlockRegenerator{
                 when(first.action){ // Restore
                     "placed" -> block.type = AIR
                     "broken" -> block.apply{
-                        type = first.mat.itemType
-                        data = first.mat.data
+                        type = first.mat
+                        blockData = first.data
                     }
                 }
             }
@@ -529,7 +506,6 @@ object BlockRegenerator{
 
         val forcelog
             get() = config.getBoolean("extras.force-log")
-                 || config.getBoolean("extras.check-by-fake-event")
 
         val broken = object {
             val enabled
@@ -614,28 +590,22 @@ object BlockRegenerator{
 
 
 
-    data class Entry(val loc: Location, val time: Long, val action: String, val mat: MaterialData)
+    data class Entry(
+        val loc: Location, val time: Long, val action: String, val mat: Material, val data: BlockData)
 
-    fun entry(block: Block, action: String): Entry {
-        val mat = MaterialData(block.type, block.data)
-        return Entry(block.location, System.currentTimeMillis(), action, mat)
-    }
+    fun entry(block: Block, action: String) =
+            Entry(block.location, System.currentTimeMillis(), action, block.type, block.blockData)
 
     fun ser(e: Entry): String {
-        val mtype = e.mat.itemType.ordinal
-        val mdata = e.mat.data
         return listOf(
-            e.loc.world.name,
-            e.loc.blockX,
-            e.loc.blockY,
-            e.loc.blockZ,
-            e.time,
-            e.action,
-            mtype, mdata
+            e.loc.world.name, e.loc.blockX,
+            e.loc.blockY, e.loc.blockZ,
+            e.time, e.action,
+            e.mat.name, e.data.asString
         ).joinToString("/")
     }
 
-    fun deser(data: String): Entry {
+    fun deser(data: String): Entry? {
         val split = data.split("/")
 
         val world = Bukkit.getWorld(split[0])
@@ -648,12 +618,18 @@ object BlockRegenerator{
 
         val action = split[5]
 
-        val mat = MaterialData(split[6].toInt(), split[7].toByte())
+        lateinit var mat: Material;
+        lateinit var bdata: BlockData;
+        if(split[6].toIntOrNull() != null) {
+            mat = Material.values().first{it.ordinal == split[6].toInt()}
+            bdata = Bukkit.createBlockData(mat);
+        } else {
+            mat = Material.getMaterial(split[6])
+            bdata = Bukkit.createBlockData(split[7])
+        }
 
-        return Entry(loc, time = time, action = action, mat = mat)
+        return Entry(loc, time = time, action = action, mat = mat, data = bdata)
     }
-
-
 
     object Entries: Table(){
         val entry = varchar("entry", length = 50)
@@ -677,15 +653,12 @@ object BlockRegenerator{
         else -> null
     }
 
-
-
-
     fun get(): MutableList<Entry> = when(config.getString("storage.type")){
-        "yaml" -> data.getStringList("data").map { e -> deser(e) }
+        "yaml" -> data.getStringList("data").mapNotNull{e -> deser(e)}
         "mysql", "sqlite" -> try{
             transaction(Connection.TRANSACTION_SERIALIZABLE, 1, db) {
                 create (Entries)
-                Entries.selectAll().map { deser(it[Entries.entry]) }
+                Entries.selectAll().mapNotNull{deser(it[Entries.entry])}
             }
         } catch (e: Exception){info("Could not connect to SQL database!"); emptyList<Entry>()}
         else -> emptyList()
@@ -708,7 +681,5 @@ object BlockRegenerator{
         }
     }
 
-    fun execute(lambda: MutableList<Entry>.() -> Unit) {
-        save(get().apply(lambda))
-    }
+    fun execute(lambda: MutableList<Entry>.() -> Unit) = save(get().apply(lambda))
 }
