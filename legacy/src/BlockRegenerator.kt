@@ -21,9 +21,7 @@ import org.bukkit.GameMode
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.Material.AIR
-import org.bukkit.Material.getMaterial
 import org.bukkit.block.Block
-import org.bukkit.block.data.BlockData
 import org.bukkit.command.CommandExecutor
 import org.bukkit.command.TabCompleter
 import org.bukkit.configuration.file.YamlConfiguration
@@ -486,7 +484,7 @@ class BlockRegeneratorPlugin: JavaPlugin() {
                     "placed" -> block.type = AIR
                     "broken" -> block.apply{
                         type = first.mat
-                        blockData = first.data
+                        data = first.data
                     }
                 }
             }
@@ -596,17 +594,17 @@ class BlockRegeneratorPlugin: JavaPlugin() {
 
 
     data class Entry(
-        val loc: Location, val time: Long, val action: String, val mat: Material, val data: BlockData)
+        val loc: Location, val time: Long, val action: String, val mat: Material, val data: Byte)
 
     fun entry(block: Block, action: String) =
-            Entry(block.location, System.currentTimeMillis(), action, block.type, block.blockData)
+            Entry(block.location, System.currentTimeMillis(), action, block.type, block.data)
 
     fun ser(e: Entry): String {
         return listOf(
             e.loc.world.name, e.loc.blockX,
             e.loc.blockY, e.loc.blockZ,
             e.time, e.action,
-            e.mat.name, e.data.asString
+            e.mat.name, e.data
         ).joinToString("/")
     }
 
@@ -623,15 +621,11 @@ class BlockRegeneratorPlugin: JavaPlugin() {
 
         val action = split[5]
 
-        lateinit var mat: Material;
-        lateinit var bdata: BlockData;
-        if(split[6].toIntOrNull() != null) {
-            mat = Material.values().first{it.ordinal == split[6].toInt()}
-            bdata = Bukkit.createBlockData(mat);
-        } else {
-            mat = Material.getMaterial(split[6])
-            bdata = Bukkit.createBlockData(split[7])
-        }
+        lateinit var mat: Material
+        if(split[6].toIntOrNull() != null)
+            mat = Material.getMaterial(split[6].toInt())
+        else mat = Material.getMaterial(split[6])
+        val bdata = split[7].toByte()
 
         return Entry(loc, time = time, action = action, mat = mat, data = bdata)
     }

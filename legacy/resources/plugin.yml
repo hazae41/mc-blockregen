@@ -1,0 +1,22 @@
+name: @name@
+version: @version@
+description: @desc@
+main: fr.rhaz.minecraft.blockregenerator.BlockRegeneratorPlugin
+author: Hazae41
+depend: [Kotlin4MC, Exposed4MC]
+softdepend: [WorldGuard, Factions, LegacyFactions, GriefPrevention, Residence, Towny]
+
+commands:
+    blockregen:
+        aliases: [br, breg]
+        description: The Kotlinized BlockRegenerator!
+        usage: "/<command>"
+
+permissions:
+    blockregen.*:
+        children:
+            blockregen.force: true
+            blockregen.toggle: true
+            blockregen.clear: true
+            blockregen.debug: true
+            blockregen.reload: true
