@@ -91,7 +91,7 @@ materials:
   materials:
   - "BLOCK_NAME" # (example: STONE)
 
-worldguard:
+worldguard: # WorldGuard plugin
   enabled: false
   # If you do not have WorldGuard leave this disabled
   type: whitelist
@@ -100,25 +100,25 @@ worldguard:
   regions:
   - "region_name"
 
-factions:
+factions: # Factions plugin
   enabled: false
   name: "Factions"
   # Plugin used
-  # Can be [Factions, SavageFactions, FactionsUUID]
+  # Can be [Factions, SavageFactions, FactionsUUID, LegacyFactions]
   type: whitelist
   # Whitelist: only restore blocks in these factions
   # Blacklist: do not restore blocks in these factions
   factions:
   - "Wilderness"
 
-griefprevention:
+griefprevention: # GriefPrevention plugin
   enabled: false
   admins-claims: false
   # Should this plugin restore admins claims?
   players-claims: true
   # Should this plugin restore players claims?
 
-residence:
+residence: # Residence plugin
   enabled: false
   type: blacklist
   # Whitelist: only restore blocks in these residences
@@ -126,13 +126,17 @@ residence:
   residences:
   - "residence_name"
 
-towny:
+towny: # Towny plugin
   enabled: false
   type: blacklist
   # Whitelist: only restore blocks in these towns
   # Blacklist: do not restore blocks in these towns
   towns:
   - "ExampleCity"
+
+lands: # Lands plugin
+  enabled: false
+  # This won't restore a block in a land
 
 extras:
   debugging: false

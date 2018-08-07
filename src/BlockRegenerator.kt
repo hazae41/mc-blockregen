@@ -11,6 +11,9 @@ import com.palmergames.bukkit.towny.Towny
 import com.palmergames.bukkit.towny.`object`.TownBlock
 import com.palmergames.bukkit.towny.`object`.TownyWorld
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
+import me.angeschossen.lands.Lands
+import me.angeschossen.lands.api.LandsAPI
+import me.angeschossen.lands.api.objects.Land
 import me.ryanhamshire.GriefPrevention.GriefPrevention
 import net.md_5.bungee.api.ChatColor.AQUA
 import net.md_5.bungee.api.ChatColor.LIGHT_PURPLE
@@ -237,7 +240,8 @@ class BlockRegeneratorPlugin: JavaPlugin() {
 
     var dependencies = mutableListOf<String>()
     fun findDependencies() = dependencies.clear().also{
-        listOf("WorldGuard", "Factions", "LegacyFactions", "GriefPrevention", "Residence", "Towny").forEach c@{
+        listOf("WorldGuard", "Factions", "LegacyFactions",
+        "GriefPrevention", "Residence", "Towny", "Lands").forEach c@{
 
             var cname = it.toLowerCase()
 
@@ -393,6 +397,17 @@ class BlockRegeneratorPlugin: JavaPlugin() {
                 "blacklist" -> if(towns.intersect(list).any()) return false
                 else -> info("towny.type is misconfigured, it should be whitelist or blacklist")
             }
+        }
+
+        run lands@{
+            if("Lands" !in dependencies) return@lands
+
+            val chunk = block.chunk
+            val lands = Lands.getLandsAPI()
+            if(!lands.isLandsWorld(block.world.name)) return@lands
+            val lworld = lands.getLandWorld(block.world.name)
+            val lchunk = lworld.getLandChunk(chunk.x, chunk.z) ?: return@lands
+            if(lchunk.land != null) return false
         }
 
     }

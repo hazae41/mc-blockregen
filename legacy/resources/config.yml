@@ -134,6 +134,10 @@ towny:
   towns:
   - "ExampleCity"
 
+lands: # Lands plugin
+  enabled: false
+  # This won't restore a block in a land
+
 extras:
   debugging: false
   # Debug this plugin
