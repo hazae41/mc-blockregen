@@ -104,7 +104,7 @@ factions: # Factions plugin
   enabled: false
   name: "Factions"
   # Plugin used
-  # Can be [Factions, SavageFactions, FactionsUUID, LegacyFactions]
+  # Can be [Factions, SavageFactions, FactionsUUID, LegacyFactions, FactionsOne]
   type: whitelist
   # Whitelist: only restore blocks in these factions
   # Blacklist: do not restore blocks in these factions

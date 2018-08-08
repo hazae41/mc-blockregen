@@ -17,10 +17,7 @@ import net.md_5.bungee.api.ChatColor.AQUA
 import net.md_5.bungee.api.ChatColor.LIGHT_PURPLE
 import net.md_5.bungee.api.chat.ClickEvent
 import net.redstoneore.legacyfactions.locality.Locality
-import org.bukkit.Bukkit
-import org.bukkit.GameMode
-import org.bukkit.Location
-import org.bukkit.Material
+import org.bukkit.*
 import org.bukkit.Material.AIR
 import org.bukkit.block.Block
 import org.bukkit.command.CommandExecutor
@@ -242,7 +239,9 @@ class BlockRegeneratorPlugin: JavaPlugin() {
             var cname = it.toLowerCase()
 
             if(it === "LegacyFactions")
-                cname = "factions"
+                if(config.getString("factions.name").toLowerCase() == "legacyfactions")
+                    cname = "factions"
+                else return@c
 
             if (!config.getBoolean("$cname.enabled"))
                 return@c;
@@ -315,29 +314,31 @@ class BlockRegeneratorPlugin: JavaPlugin() {
 
             val type = config.getString("factions.type")
 
-            val factions = config.getStringList("factions.factions")
+            val factions = config.getStringList("factions.factions").map{it.toLowerCase()}
 
             val name = config.getString("factions.name").toLowerCase()
 
             when(name){
-                "factions", "savagefactions", "factionsuuid" ->
-                    if("Factions" !in dependencies) return@factions
-                "legacyfactions" ->
-                    if("LegacyFactions" !in dependencies) return@factions
+                "legacyfactions" -> if("LegacyFactions" !in dependencies) return@factions
+                else -> if("Factions" !in dependencies) return@factions
             }
 
             val faction = when(name){
                 "factions" -> BoardColl.get().getFactionAt(PS.valueOf(block)).name
                 "savagefactions", "factionsuuid" -> Board.getInstance().getFactionAt(FLocation(block)).tag
                 "legacyfactions" -> LegacyBoard.get().getFactionAt(Locality.of(block)).tag
+                "factionsone" -> {
+                    val f = Board::class.java.getMethod("getFactionAt", Block::class.java).invoke(null, block)
+                    f::class.java.getMethod("getTag").invoke(f) as String
+                }
                 else -> return@factions info(
-                    "factions.name is misconfigured, it should be " +
-                    "Factions, SavageFactions, FactionsUUID or LegacyFactions")
-            }
+                        "factions.name is misconfigured, it should be " +
+                        "Factions, SavageFactions, FactionsUUID, LegacyFactions or FactionsOne")
+            }.let{ChatColor.stripColor(ChatColor.translateAlternateColorCodes('&', it))}
 
             when(type){
-                "whitelist" -> if(faction !in factions) return false
-                "blacklist" -> if(faction in factions) return false
+                "whitelist" -> if(faction.toLowerCase() !in factions) return false
+                "blacklist" -> if(faction.toLowerCase() in factions) return false
                 else -> info("factions.type is misconfigured, it should be whitelist or blacklist")
             }
         }
