@@ -20,8 +20,7 @@ fun JavaPlugin.donate(color: ChatColor) {
             .filter {it.description.authors.intersect(listOf("Hazae41", "RHazDev")).any()}
             .map {it.description.name}
 
-    server.consoleSender.spigot().sendMessage(text(
-    """
+    val msg = """
     |
     |    __         _    ____  __   ___
     |   |__) |__|  /_\   ___/ |  \ |__  \  /
@@ -35,11 +34,9 @@ fun JavaPlugin.donate(color: ChatColor) {
     |
     |   Click here to donate: http://dev.rhaz.fr/donate
     |
-    """
-    .trimMargin("|")).apply {
-        this.color = color
-        clickEvent = ClickEvent(ClickEvent.Action.OPEN_URL, "http://dev.rhaz.fr/donate")
-    })
+    """.trimMargin("|");
+
+    logger.info(color.toString() + msg);
 }
 
 fun JavaPlugin.update(id: Int, color: ChatColor) = server.scheduler.runTaskLaterAsynchronously(this, {
