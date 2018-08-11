@@ -89,7 +89,8 @@ materials:
   # Whitelist: only restore blocks materials in these materials
   # Blacklist: do not restore blocks materials in these materials
   materials:
-  - "BLOCK_NAME" # (example: STONE)
+  - bedrock
+  - "minecraft:chest" # Explicit names are only available for 1.13
 
 worldguard: # WorldGuard plugin
   enabled: false

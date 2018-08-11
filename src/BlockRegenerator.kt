@@ -53,17 +53,20 @@ class BlockRegeneratorPlugin: JavaPlugin() {
 
     override fun onEnable() {
 
+        donate(AQUA)
+        update(58011, LIGHT_PURPLE)
+
         config = load(configfile) ?:
-                return info("Config could not be loaded");
+                return info("Config could not be loaded").also{pluginLoader.disablePlugin(this)}
+
+        findDependencies()
 
         when(config.getString("storage.type")){
             "yaml" -> data = load(datafile) ?:
-                    return info("YAML data could not be loaded")
+                    return info("YAML data could not be loaded").also{pluginLoader.disablePlugin(this)}
             "sqlite", "mysql" -> db = database() ?:
-                    return info("SQL database could not be loaded")
+                    return info("SQL database could not be loaded").also{pluginLoader.disablePlugin(this)}
         }
-
-        findDependencies()
 
         getCommand("blockregen").apply {
             executor = cmd
@@ -71,9 +74,6 @@ class BlockRegeneratorPlugin: JavaPlugin() {
         };
 
         server.pluginManager.registerEvents(listener, this);
-
-        donate(AQUA)
-        update(58011, LIGHT_PURPLE)
 
         schedule()
     }
@@ -233,18 +233,16 @@ class BlockRegeneratorPlugin: JavaPlugin() {
 
     var dependencies = mutableListOf<String>()
     fun findDependencies() = dependencies.clear().also{
-        listOf("WorldGuard", "Factions", "LegacyFactions",
+        listOf("Exposed4MC", "WorldGuard", "Factions", "LegacyFactions",
         "GriefPrevention", "Residence", "Towny", "Lands").forEach c@{
 
-            var cname = it.toLowerCase()
-
-            if(it === "LegacyFactions")
-                if(config.getString("factions.name").toLowerCase() == "legacyfactions")
-                    cname = "factions"
-                else return@c
-
-            if (!config.getBoolean("$cname.enabled"))
-                return@c;
+            when(it){
+                "Exposed4MC" -> if(config.getString("storage.type") == "yaml") return@c
+                "LegacyFactions" ->
+                        if(config.getString("factions.name").toLowerCase() != "legacyfactions"
+                        || !config.getBoolean("factions.enabled")) return@c;
+                else -> if(!config.getBoolean("${it.toLowerCase()}.enabled")) return@c;
+            }
 
             server?.pluginManager?.getPlugin(it)
                     ?: return@c info("Could not load $it")
@@ -258,18 +256,16 @@ class BlockRegeneratorPlugin: JavaPlugin() {
     fun restore(block: Block): Boolean = true.also{ it ->
 
         run materials@{
-            if(!config.getBoolean("materials.enabled"))
-                return@materials
+            if(!config.getBoolean("materials.enabled")) return@materials
 
             val type = config.getString("materials.type")
-
-            val materials = config.getStringList("materials.materials")
-
-            val material = block.type.name
+            val materials = config.getStringList("materials.materials").map{it.toLowerCase()}
+            val material = block.type.name.toLowerCase()
+            val name = block.blockData.asString.split("[")[0]
 
             when(type){
-                "whitelist" -> if(material !in materials) return false
-                "blacklist" -> if(material in materials) return false
+                "whitelist" -> if(material !in materials && name !in materials) return false
+                "blacklist" -> if(material in materials || name in materials) return false
                 else -> info("materials.type is misconfigured, it should be whitelist or blacklist")
             }
         }
@@ -655,17 +651,26 @@ class BlockRegeneratorPlugin: JavaPlugin() {
     var db: Database? = null
 
     fun database() = when(config.getString("storage.type")){
-        "sqlite" -> Database.connect("jdbc:sqlite:plugins/BlockRegenerator/data.db", "org.sqlite.JDBC")
-        "mysql" -> {
-            val host = config.getString("storage.mysql.host")
-            val db = config.getString("storage.mysql.database")
-            val user = config.getString("storage.mysql.user")
-            val password = config.getString("storage.mysql.password")
-            Database.connect(
-                "jdbc:mysql://$host/$db",
-                driver = "com.mysql.jdbc.Driver",
-                user = user,
-                password = password)
+        "sqlite" ->
+            if("Exposed4MC" !in dependencies) {
+                info("You must install Exposed4MC to use SQL")
+                null;
+            } else Database.connect("jdbc:sqlite:plugins/BlockRegenerator/data.db", "org.sqlite.JDBC")
+        "mysql" -> here@{
+            if("Exposed4MC" !in dependencies) {
+                info("You must install Exposed4MC to use SQL")
+                null;
+            } else {
+                val host = config.getString("storage.mysql.host")
+                val db = config.getString("storage.mysql.database")
+                val user = config.getString("storage.mysql.user")
+                val password = config.getString("storage.mysql.password")
+                Database.connect(
+                        "jdbc:mysql://$host/$db",
+                        driver = "com.mysql.jdbc.Driver",
+                        user = user,
+                        password = password)
+            }
         }
         else -> null
     }
@@ -673,7 +678,10 @@ class BlockRegeneratorPlugin: JavaPlugin() {
     fun get(): MutableList<Entry> = when(config.getString("storage.type")){
         "yaml" -> data.getStringList("data").mapNotNull{e -> deser(e)}
         "mysql", "sqlite" -> try{
-            transaction(Connection.TRANSACTION_SERIALIZABLE, 1, db) {
+            if("Exposed4MC" !in dependencies){
+                info("You must install Exposed4MC to use SQL")
+                emptyList()
+            } else transaction(Connection.TRANSACTION_SERIALIZABLE, 1, db) {
                 create (Entries)
                 Entries.selectAll().mapNotNull{deser(it[Entries.entry])}
             }
@@ -688,7 +696,9 @@ class BlockRegeneratorPlugin: JavaPlugin() {
                 save(datafile)
             }
             "sqlite", "mysql" -> try{
-                transaction(Connection.TRANSACTION_SERIALIZABLE, 1, db) {
+                if("Exposed4MC" !in dependencies)
+                    info("You must install Exposed4MC to use SQL")
+                else transaction(Connection.TRANSACTION_SERIALIZABLE, 1, db) {
                     create (Entries)
                     Entries.deleteAll()
                     Entries.batchInsert(list.map{ser(it)})

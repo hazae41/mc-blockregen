@@ -3,8 +3,8 @@ version: @version@
 description: @desc@
 main: fr.rhaz.minecraft.blockregenerator.BlockRegeneratorPlugin
 author: Hazae41
-depend: [Kotlin4MC, Exposed4MC]
-softdepend: [WorldGuard, Factions, LegacyFactions, GriefPrevention, Residence, Towny]
+depend: [Kotlin4MC]
+softdepend: [Exposed4MC, WorldGuard, Factions, LegacyFactions, GriefPrevention, Residence, Towny]
 
 commands:
     blockregen:
