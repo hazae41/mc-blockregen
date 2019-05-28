@@ -1,0 +1,4 @@
+name: BlockRegen-Factions
+main: hazae41.minecraft.blockregen.factions.Plugin
+version: @version@
+depend: [BlockRegen, Factions]

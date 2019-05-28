@@ -1,0 +1,39 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.3.21'
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '4.0.2'
+}
+
+import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
+task relocateShadowJar(type: ConfigureShadowRelocation) {
+    target = tasks.shadowJar
+    prefix = "hazae41.blockregen"
+}
+
+
+group 'hazae41'
+version '2.0'
+
+apply from: 'mcplugin.gradle'
+apply from: 'spigot.gradle'
+
+repositories {
+    mavenCentral()
+    maven { url "https://dl.bintray.com/kotlin/exposed/" }
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    compileOnly  'com.github.hazae41:mc-blockregen:21e168858a'
+    compileOnly fileTree(dir: 'libs', include: ['*.jar'])
+}
+
+compileKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
+compileTestKotlin {
+    kotlinOptions.jvmTarget = "1.8"
+}
