@@ -79,7 +79,7 @@ class Plugin: BukkitPlugin() {
 
 val currentMillis get() = System.currentTimeMillis()
 val Player.isCreative get() = gameMode === GameMode.CREATIVE
-fun Plugin.shouldRestore(block: Block) = controllers.any { it(block) }
+fun shouldRestore(block: Block) = controllers.all { it(block) }
 fun Plugin.alert(msg: String) = server.onlinePlayers.forEach{it.msg(msg)}
 
 fun Plugin.makeTimer(){
@@ -169,7 +169,8 @@ fun Plugin.regen() = transaction {
     info("Performing block regeneration...")
     val startTime = currentMillis
 
-    for(i in 0..(maxBlocks-1)){
+    var i = 0
+    while(i in 0..(maxBlocks-1)){
         // Get an initial action
         val first = entries.firstOrNull() ?: break
         // Do not process futures
@@ -185,6 +186,8 @@ fun Plugin.regen() = transaction {
         if(diff <= minTime) continue
         // Removes history of this block
         futures.forEach{it.delete()}
+        // Go to the next block
+        i++
         // If no chance, do nothing, keeping the history blank
         if(Random().nextInt(100) >= Config.efficiency) continue
         // Restore
@@ -266,25 +269,25 @@ fun Plugin.makeCommands() = command("blockregen"){ args ->
 
 fun Plugin.makeControllers() {
 
-    fun byMaterial(block: Block) = false.also {
+    fun byMaterial(block: Block) = true.also {
         val config = Config.controllers.materials
-        if(!config.enabled) return false
+        if(!config.enabled) return true
         val list = config.list.map{ it.lowerCase }
         val material = block.type.name.lowerCase
         when(config.type){
-            "whitelist" -> if(material in list) return true
-            "blacklist" -> if(material !in list) return true
+            "whitelist" -> if(material !in list) return false
+            "blacklist" -> if(material in list) return false
         }
     }
 
-    fun byWorld(block: Block) = false.also {
+    fun byWorld(block: Block) = true.also {
         val config = Config.controllers.worlds
-        if(!config.enabled) return false
+        if(!config.enabled) return true
         val list = config.list.map{ it.lowerCase }
         val world = block.location.world.name.lowerCase
         when(config.type){
-            "whitelist" -> if(world in list) return true
-            "blacklist" -> if(world !in list) return true
+            "whitelist" -> if(world !in list) return false
+            "blacklist" -> if(world in list) return false
         }
     }
 
