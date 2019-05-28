@@ -1,0 +1,28 @@
+repositories {
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation "com.github.Hazae41:Kotlin4MC:master-SNAPSHOT"
+}
+
+// Resources parser
+import org.apache.tools.ant.filters.ReplaceTokens
+processResources.with copySpec {
+    from 'src/main/resources' // Resources folder
+    filter(ReplaceTokens, tokens: [ // Placeholders to replace
+        'version':version,
+    ])
+}
+
+tasks.shadowJar {
+    classifier = 'bundle'
+    //dependsOn tasks.relocateShadowJar
+    dependsOn 'clean'
+    mustRunAfter 'clean'
+    destinationDir = file("$rootDir/jar")
+}
+
+artifacts {
+    archives shadowJar
+}

@@ -1,0 +1,19 @@
+name: BlockRegen
+version: @version@
+main: hazae41.minecraft.blockregen.Plugin
+author: hazae41
+
+commands:
+  blockregen:
+    aliases: [br, breg]
+    description: The Kotlinized BlockRegenerator!
+    usage: "/<command>"
+
+permissions:
+  blockregen.*:
+    children:
+      blockregen.info: true
+      blockregen.force: true
+      blockregen.toggle: true
+      blockregen.clear: true
+      blockregen.reload: true
