@@ -1,4 +1,4 @@
-name: BlockRegen-Factions
-main: hazae41.minecraft.blockregen.factions.Plugin
+name: BlockRegen-WorldGuard
+main: hazae41.minecraft.blockregen.worldguard.Plugin
 version: @version@
-depend: [BlockRegen, Factions]
+depend: [BlockRegen, WorldGuard]
