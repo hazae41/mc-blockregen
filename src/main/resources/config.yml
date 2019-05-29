@@ -1,4 +1,4 @@
 enabled: true
-type: whitelist
+type: blacklist
 list:
-  - "Wilderness"
+  - "residence_name"
