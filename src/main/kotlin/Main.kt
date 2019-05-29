@@ -1,8 +1,6 @@
 package hazae41.minecraft.blockregen.worldguard
 
-import com.sk89q.worldedit.bukkit.BukkitWorld
-import com.sk89q.worldedit.math.BlockVector3
-import com.sk89q.worldguard.WorldGuard
+import com.sk89q.worldguard.bukkit.WorldGuardPlugin
 import hazae41.minecraft.blockregen.controllers
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.ConfigFile
@@ -20,10 +18,8 @@ fun addController(){
     controllers += fun(block: Block) = true.also{
         if(!Config.enabled) return true
         val list = Config.list.map { it.lowerCase }
-        val regions = WorldGuard.getInstance().platform.run {
-            val world = BukkitWorld(block.world)
-            val vector = BlockVector3.at(block.x, block.y, block.z)
-            regionContainer.get(world)!!.getApplicableRegions(vector).map { it.id }
+        val regions = WorldGuardPlugin.inst().run {
+            regionContainer.get(block.world)!!.getApplicableRegions(block.location).map { it.id }
         }
         when(Config.type){
             "whitelist" -> if(list.intersect(regions).isEmpty()) return false
