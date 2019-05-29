@@ -1,7 +1,7 @@
 package hazae41.minecraft.blockregen.factions
 
-import com.massivecraft.factions.entity.BoardColl
-import com.massivecraft.massivecore.ps.PS
+import com.massivecraft.factions.Board
+import com.massivecraft.factions.FLocation
 import hazae41.minecraft.blockregen.controllers
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.ConfigFile
@@ -22,7 +22,7 @@ fun addController(){
         if(!Config.enabled) return true
         val list = Config.list.map { it.lowerCase }
         fun colorless(str: String) = stripColor(translateAlternateColorCodes('&', str))
-        val faction = BoardColl.get().getFactionAt(PS.valueOf(block)).name.lowerCase.let(::colorless)
+        val faction = Board.getInstance().getFactionAt(FLocation(block)).tag.lowerCase.let(::colorless)
         when(Config.type){
             "whitelist" -> if(faction !in list) return false
             "blacklist" -> if(faction in list) return false
