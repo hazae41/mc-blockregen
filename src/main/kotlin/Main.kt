@@ -1,14 +1,13 @@
-package hazae41.minecraft.blockregen.factions
+package hazae41.minecraft.blockregen.towny
 
-import com.massivecraft.factions.entity.BoardColl
-import com.massivecraft.massivecore.ps.PS
+import com.palmergames.bukkit.towny.Towny
+import com.palmergames.bukkit.towny.`object`.TownBlock
+import com.palmergames.bukkit.towny.`object`.TownyWorld
 import hazae41.minecraft.blockregen.controllers
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.ConfigFile
 import hazae41.minecraft.kotlin.bukkit.init
 import hazae41.minecraft.kotlin.lowerCase
-import org.bukkit.ChatColor.stripColor
-import org.bukkit.ChatColor.translateAlternateColorCodes
 import org.bukkit.block.Block
 
 object Config: ConfigFile("config"){
@@ -21,11 +20,13 @@ fun addController(){
     controllers += fun(block: Block) = true.also{
         if(!Config.enabled) return true
         val list = Config.list.map { it.lowerCase }
-        fun colorless(str: String) = stripColor(translateAlternateColorCodes('&', str))
-        val faction = BoardColl.get().getFactionAt(PS.valueOf(block)).name.lowerCase.let(::colorless)
+        val tblock = TownBlock(block.x, block.z, TownyWorld(block.world.name))
+        val towns = Towny.getPlugin().townyUniverse.townsMap.values
+                .filter { it.hasTownBlock(tblock) }
+                .map { it.tag }
         when(Config.type){
-            "whitelist" -> if(faction !in list) return false
-            "blacklist" -> if(faction in list) return false
+            "whitelist" -> if(towns.intersect(list).isEmpty()) return false
+            "blacklist" -> if(towns.intersect(list).any()) return false
         }
     }
 }
