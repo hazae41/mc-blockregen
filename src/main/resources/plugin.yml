@@ -1,4 +1,4 @@
-name: BlockRegen-Factions
-main: hazae41.minecraft.blockregen.factions.Plugin
+name: BlockRegen-GriefPrevention
+main: hazae41.minecraft.blockregen.griefprevention.Plugin
 version: @version@
-depend: [BlockRegen, Factions]
+depend: [BlockRegen, GriefPrevention]

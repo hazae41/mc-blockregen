@@ -1,4 +1,3 @@
 enabled: true
-type: whitelist
-list:
-  - "Wilderness"
+restore-admin-claims: false
+restore-player-claims: true
