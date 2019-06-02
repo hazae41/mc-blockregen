@@ -2,12 +2,12 @@ package hazae41.minecraft.blockregen.griefprevention
 
 import hazae41.minecraft.blockregen.controllers
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
-import hazae41.minecraft.kotlin.bukkit.ConfigFile
+import hazae41.minecraft.kotlin.bukkit.PluginConfigFile
 import hazae41.minecraft.kotlin.bukkit.init
 import me.ryanhamshire.GriefPrevention.GriefPrevention
 import org.bukkit.block.Block
 
-object Config: ConfigFile("config"){
+object Config: PluginConfigFile("config"){
     val enabled by boolean("enabled")
     val restoreAdmins by boolean("restore-admin-claims")
     val restorePlayers by boolean("restore-player-claims")
