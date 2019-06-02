@@ -3,7 +3,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.Hazae41:Kotlin4MC:master-SNAPSHOT"
+    implementation "com.github.hazae41:mc-kotlin:3.1"
 }
 
 // Resources parser

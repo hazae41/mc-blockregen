@@ -17,7 +17,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-object Config: ConfigFile("config"){
+object Config: PluginConfigFile("config"){
     val alertBefore by string("alert.before")
     val alertBeforeDelay by string("alert.before-delay")
     val alertAfter by string("alert.after")
@@ -141,7 +141,6 @@ fun Plugin.makeListeners(){
         when(config.type){
             "whitelist" -> if(entity !in list) return@listen
             "blacklist" -> if(entity in list) return@listen
-            else -> return@listen
         }
         for(block in it.blockList()){
             if(Config.forceLog || shouldRestore(block))
@@ -243,12 +242,11 @@ fun Plugin.makeCommands() = command("blockregen"){ args ->
                     false -> msg("&aRegeneration is now enabled")
                 }
             }
-            "reload", "r" -> {
-                checkPerm("reload")
-                Config.reload()
+            "restart", "r" -> {
+                checkPerm("restart")
                 server.scheduler.cancelTasks(this@makeCommands)
                 makeTimer()
-                msg("&bConfig reloaded")
+                msg("&bTimer restarted")
             }
             else -> {
                 checkPerm("help")
@@ -259,7 +257,7 @@ fun Plugin.makeCommands() = command("blockregen"){ args ->
                 }
                 msg("&bForce regen: force, f")
                 msg("&bToggle regen: toggle, t")
-                msg("&bReload config: reload, r")
+                msg("&bRestart timer: restart, r")
                 msg("&bDatabase infos: info, i")
                 msg("&bClear database: clear, c")
             }

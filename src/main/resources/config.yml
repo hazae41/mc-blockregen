@@ -55,7 +55,7 @@ events:
     # Blacklist: do not restore explosions caused by these entities
     list:
       - creeper
-      - tnt
+      - primed_tnt
 
 controllers:
   worlds:
