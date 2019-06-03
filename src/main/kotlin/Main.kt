@@ -67,7 +67,7 @@ val controllers = mutableListOf<(Block) -> Boolean>()
 
 class Plugin: BukkitPlugin() {
     override fun onEnable() {
-        update(58011)
+        update(67964)
         init(Config)
         makeDatabase()
         makeTimer()
