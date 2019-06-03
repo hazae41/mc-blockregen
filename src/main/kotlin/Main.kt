@@ -1,4 +1,4 @@
-package hazae41.minecraft.blockregen.factions
+package hazae41.minecraft.blockregen.residence
 
 import com.bekvon.bukkit.residence.Residence
 import hazae41.minecraft.blockregen.controllers
