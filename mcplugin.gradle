@@ -17,6 +17,7 @@ processResources.with copySpec {
 
 tasks.shadowJar {
     classifier = 'bundle'
+    relocate "hazae41.minecraft.kotlin", "hazae41.minecraft.blockregen.hazae41.minecraft.kotlin"
     //dependsOn tasks.relocateShadowJar
     dependsOn 'clean'
     mustRunAfter 'clean'
