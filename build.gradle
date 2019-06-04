@@ -14,7 +14,7 @@ task relocateShadowJar(type: ConfigureShadowRelocation) {
 
 
 group 'hazae41'
-version '2.0'
+version '2.1.2'
 
 apply from: 'mcplugin.gradle'
 apply from: 'spigot.gradle'
