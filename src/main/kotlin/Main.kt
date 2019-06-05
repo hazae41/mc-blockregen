@@ -4,6 +4,9 @@ import hazae41.minecraft.kotlin.bukkit.*
 import hazae41.minecraft.kotlin.catch
 import hazae41.minecraft.kotlin.lowerCase
 import hazae41.minecraft.kotlin.toTimeWithUnit
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.block.Block
@@ -18,6 +21,8 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 
 object Config: PluginConfigFile("config"){
+    override var minDelay = 5000L
+
     val alertBefore by string("alert.before")
     val alertBeforeDelay by string("alert.before-delay")
     val alertAfter by string("alert.after")
@@ -142,9 +147,13 @@ fun Plugin.makeListeners(){
             "whitelist" -> if(entity !in list) return@listen
             "blacklist" -> if(entity in list) return@listen
         }
-        for(block in it.blockList()){
-            if(Config.forceLog || shouldRestore(block))
-            addEntry(block, "broken")
+
+        val snaps = it.blockList().let {
+            if(Config.forceLog) it else it.filter(::shouldRestore)
+        }.map(::BlockSnapshot)
+
+        schedule(async = true) {
+            for(snap in snaps) addEntry(snap, "broken")
         }
     }
 }

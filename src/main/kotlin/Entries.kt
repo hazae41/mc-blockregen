@@ -24,16 +24,24 @@ fun Plugin.makeDatabase() {
     transaction  { SchemaUtils.create(Entries) }
 }
 
-fun Plugin.addEntry(block: Block, _action: String)
+class BlockSnapshot(block: Block){
+    val millis = currentMillis
+    val location = block.location
+    val data = block.state.data
+}
+
+fun Plugin.addEntry(snap: BlockSnapshot, _action: String)
     = transaction{
         val last = Entry.all().lastOrNull()?.id?.value
         Entry.new((last?:0)+1) {
-            millis = currentMillis
-            location = block.location
+            millis = snap.millis
+            location = snap.location
             action = _action
-            data = block.state.data
+            data = snap.data
         }
     }
+
+fun Plugin.addEntry(block: Block, _action: String) = addEntry(BlockSnapshot(block), _action)
 
 object Entries: IntIdTable(){
     val millis = long("millis")
