@@ -3,7 +3,7 @@ repositories {
 }
 
 dependencies {
-    compileOnly "com.github.hazae41:mc-kotlin:3.1"
+    compileOnly "com.github.hazae41:mc-kotlin:3.1.2"
 }
 
 // Resources parser
