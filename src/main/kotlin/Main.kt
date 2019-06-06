@@ -4,24 +4,19 @@ import hazae41.minecraft.kotlin.bukkit.*
 import hazae41.minecraft.kotlin.catch
 import hazae41.minecraft.kotlin.lowerCase
 import hazae41.minecraft.kotlin.toTimeWithUnit
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import org.bukkit.GameMode
-import org.bukkit.Material
+import jdk.nashorn.internal.objects.Global
+import kotlinx.coroutines.*
+import net.coreprotect.CoreProtectAPI
+import org.bukkit.Location
 import org.bukkit.block.Block
-import org.bukkit.entity.Player
-import org.bukkit.event.EventPriority.MONITOR
-import org.bukkit.event.block.BlockBreakEvent
-import org.bukkit.event.block.BlockBurnEvent
-import org.bukkit.event.block.BlockPlaceEvent
-import org.bukkit.event.entity.EntityExplodeEvent
 import org.jetbrains.exposed.sql.transactions.transaction
-import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.random.Random
 
 object Config: PluginConfigFile("config"){
     override var minDelay = 5000L
+
+    var paused by boolean("paused")
 
     val alertBefore by string("alert.before")
     val alertBeforeDelay by string("alert.before-delay")
@@ -29,32 +24,12 @@ object Config: PluginConfigFile("config"){
 
     val regenDelay by string("regen-delay")
     val minTime by string("min-time")
-    val maxBlocks by string("max-blocks")
+
+    val amount by int("amount")
     val efficiency by int("efficiency")
+    val radius by int("radius")
 
-    var paused by boolean("paused")
-    val forceLog by boolean("extras.force-log")
-
-    object events: ConfigSection(this, "events"){
-        object broken: ConfigSection(this, "broken"){
-            val enabled by boolean("enabled")
-            val ignoreCreative by boolean("ignore-creative")
-        }
-        object placed: ConfigSection(this, "placed"){
-            val enabled by boolean("enabled")
-            val ignoreCreative by boolean("ignore-creative")
-        }
-        object burnt: ConfigSection(this, "burnt"){
-            val enabled by boolean("enabled")
-        }
-        object exploded: ConfigSection(this, "exploded"){
-            val enabled by boolean("enabled")
-            val type by string("type")
-            val list by stringList("list")
-        }
-    }
-
-    object controllers: ConfigSection(this, "controllers"){
+    object filters: ConfigSection(this, "filters"){
         object materials: ConfigSection(this, "materials"){
             val enabled by boolean("enabled")
             val type by string("type")
@@ -68,6 +43,7 @@ object Config: PluginConfigFile("config"){
     }
 }
 
+val filters = mutableListOf<(Block) -> Boolean>()
 val controllers = mutableListOf<(Block) -> Boolean>()
 
 class Plugin: BukkitPlugin() {
@@ -76,16 +52,17 @@ class Plugin: BukkitPlugin() {
         init(Config)
         makeDatabase()
         makeTimer()
-        makeListeners()
         makeCommands()
-        makeControllers()
+        makeFilters()
     }
 }
 
 val currentMillis get() = System.currentTimeMillis()
-val Player.isCreative get() = gameMode === GameMode.CREATIVE
-fun shouldRestore(block: Block) = controllers.all { it(block) }
-fun Plugin.alert(msg: String) = server.onlinePlayers.forEach{it.msg(msg)}
+fun shouldRestore(block: Block) = (filters+controllers).all { it(block) }
+
+fun Plugin.alert(msg: String) {
+    if(msg.isNotBlank()) server.onlinePlayers.forEach{it.msg(msg)}
+}
 
 fun Plugin.makeTimer(){
     val (regenDelayValue, regenDelayUnit) = Config.regenDelay.toTimeWithUnit()
@@ -94,16 +71,12 @@ fun Plugin.makeTimer(){
     val (alertDelayValue, alertDelayUnit) = Config.alertBeforeDelay.toTimeWithUnit()
     val alertDelay = TimeUnit.SECONDS.convert(alertDelayValue, alertDelayUnit)
 
-    Config.alertBefore.also { msg ->
-        if(alertDelay > regenDelay) return@also
-        if(msg.isEmpty()) return@also
-        schedule(
-            delay = regenDelay,
-            period = regenDelay,
-            unit = TimeUnit.SECONDS,
-            callback = { alert(msg) }
-        )
-    }
+    if(alertDelay < regenDelay) schedule(
+        delay = regenDelay,
+        period = regenDelay,
+        unit = TimeUnit.SECONDS,
+        callback = { alert(Config.alertBefore) }
+    )
 
     schedule(
         delay = regenDelay + alertDelay,
@@ -113,103 +86,69 @@ fun Plugin.makeTimer(){
     )
 }
 
-fun Plugin.makeListeners(){
-    listen<BlockBreakEvent>(MONITOR){
-        if(!Config.paused)
-        if(Config.events.broken.enabled)
-        if(!it.player.isCreative || !Config.events.broken.ignoreCreative)
-        if(Config.forceLog || shouldRestore(it.block))
-        addEntry(it.block, "broken")
-    }
+fun Plugin.regen() = GlobalScope.launch {
+    if(Config.paused) return@launch
 
-    listen<BlockPlaceEvent>(MONITOR){
-        if(!Config.paused)
-        if(Config.events.placed.enabled)
-        if(!it.player.isCreative || !Config.events.placed.ignoreCreative)
-        if(Config.forceLog || shouldRestore(it.block))
-        addEntry(it.block, "placed")
-    }
-
-    listen<BlockBurnEvent>(MONITOR){
-        if(!Config.paused)
-        if(Config.events.burnt.enabled)
-        if(Config.forceLog || shouldRestore(it.block))
-        addEntry(it.block, "broken")
-    }
-
-    listen<EntityExplodeEvent>(MONITOR){
-        if(Config.paused) return@listen
-        val config = Config.events.exploded
-        if(!config.enabled) return@listen
-        val entity = it.entityType.name.lowerCase
-        val list = config.list.map { it.lowerCase }
-        when(config.type){
-            "whitelist" -> if(entity !in list) return@listen
-            "blacklist" -> if(entity in list) return@listen
-        }
-
-        val snaps = it.blockList().let {
-            if(Config.forceLog) it else it.filter(::shouldRestore)
-        }.map(::BlockSnapshot)
-
-        schedule(async = true) {
-            for(snap in snaps) addEntry(snap, "broken")
-        }
-    }
-}
-
-fun Plugin.regen() = transaction {
-    if(Config.paused) return@transaction
+    val api = CoreProtectAPI()
 
     val (minTimeValue, minTimeUnit) = Config.minTime.toTimeWithUnit()
     val minTime = TimeUnit.MILLISECONDS.convert(minTimeValue, minTimeUnit)
 
-    val entries = Entry.all().toMutableList()
+    val ignored = transaction { Entry.all() }
 
-    val maxBlocks =
-        if(!Config.maxBlocks.endsWith("%"))
-            Config.maxBlocks.toInt()
-        else {
-            val percent = Config.maxBlocks.dropLast(1).toInt()
-            Math.floorDiv(percent * entries.count(), 100)
+    server.worlds.forEach { world ->
+
+        val lookup = world.players.flatMap { player ->
+            api.performLookup(
+                Int.MAX_VALUE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                Config.radius,
+                player.location
+            ) ?: return@forEach
         }
 
-    info("Performing block regeneration...")
-    val startTime = currentMillis
+        if(lookup.isEmpty()) return@forEach
 
-    var i = 0
-    while(i in 0..(maxBlocks-1)){
-        // Get an initial action
-        val first = entries.firstOrNull() ?: break
-        // Do not process futures
-        val futures = entries.filter { it.location == first.location }
-        entries.removeAll(futures)
-        // Get the last action
-        val last = futures.last()
-        // Check if the block matches the filter
-        val block = first.location.block
-        if(!shouldRestore(block)) continue
-        // Check if the block is old enough
-        val diff = currentMillis - last.millis
-        if(diff <= minTime) continue
-        // Removes history of this block
-        futures.forEach{it.delete()}
-        // Go to the next block
-        i++
-        // If no chance, do nothing, keeping the history blank
-        if(Random().nextInt(100) >= Config.efficiency) continue
-        // Restore
-        when(first.action){ // Restore
-            "placed" -> block.type = Material.AIR
-            "broken" -> block.apply{
-                type = first.data.itemType
-                data = first.data.data
+        val results = lookup.map { api.parseResult(it) }
+
+        var resultsByBlock = withContext(Dispatchers.Unconfined){
+            results.groupBy { world.getBlockAt(it.x, it.y, it.z) }
+        }
+
+        resultsByBlock = transaction {
+            resultsByBlock.filterKeys { block -> ignored.all { it.location != block.location } }
+        }
+
+        val newIgnored = mutableListOf<Location>()
+
+        resultsByBlock.forEach { block, bresults ->
+            if(Random.nextInt(100) >= Config.amount) return@forEach
+            if(!shouldRestore(block)) return@forEach
+            if(bresults.any { it.time < minTime}) return@forEach
+
+            if(Random.nextInt(100) >= Config.efficiency)
+                newIgnored += block.location
+
+            else schedule(async = true){
+                api.performRollback(
+                    Integer.MAX_VALUE,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    1,
+                    block.location
+                )
             }
         }
-    }
 
-    val endTime = currentMillis
-    info("Regeneration complete, took ${endTime - startTime} ms.")
+        transaction { newIgnored.forEach{ addEntry(it) } }
+    }
 
     alert(Config.alertAfter)
 }
@@ -224,24 +163,6 @@ fun Plugin.makeCommands() = command("blockregen"){ args ->
                 checkPerm("force")
                 msg("&bForcing block regeneration...")
                 regen()
-            }
-            "info", "i" -> {
-                checkPerm("info")
-                transaction{
-                    val entries = Entry.all()
-                    val placed = entries.filter { it.action == "placed" }.size
-                    val broken = entries.filter { it.action == "broken" }.size
-                    msg("&bTotal: ${entries.count()}")
-                    msg("&bPlaced: $placed")
-                    msg("&bBroken: $broken")
-                }
-            }
-            "clear", "c" -> {
-                checkPerm("clear")
-                transaction {
-                    Entry.all().forEach { it.delete() }
-                }
-                msg("&6Block forcibly cleared")
             }
             "toggle", "t" -> {
                 checkPerm("toggle")
@@ -267,17 +188,15 @@ fun Plugin.makeCommands() = command("blockregen"){ args ->
                 msg("&bForce regen: force, f")
                 msg("&bToggle regen: toggle, t")
                 msg("&bRestart timer: restart, r")
-                msg("&bDatabase infos: info, i")
-                msg("&bClear database: clear, c")
             }
         }
     }
 }
 
-fun Plugin.makeControllers() {
+fun Plugin.makeFilters() {
 
     fun byMaterial(block: Block) = true.also {
-        val config = Config.controllers.materials
+        val config = Config.filters.materials
         if(!config.enabled) return true
         val list = config.list.map{ it.lowerCase }
         val material = block.type.name.lowerCase
@@ -288,7 +207,7 @@ fun Plugin.makeControllers() {
     }
 
     fun byWorld(block: Block) = true.also {
-        val config = Config.controllers.worlds
+        val config = Config.filters.worlds
         if(!config.enabled) return true
         val list = config.list.map{ it.lowerCase }
         val world = block.location.world.name.lowerCase
@@ -298,5 +217,5 @@ fun Plugin.makeControllers() {
         }
     }
 
-    controllers.addAll(listOf(::byMaterial, ::byWorld))
+    filters.addAll(listOf(::byMaterial, ::byWorld))
 }

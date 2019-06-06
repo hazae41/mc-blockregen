@@ -18,30 +18,20 @@ import java.io.File
 import java.sql.Connection
 
 fun Plugin.makeDatabase() {
-    val dbFile = File(dataFolder, "blocks.db")
+    val dbFile = File(dataFolder, "ignored.db")
     Database.connect("jdbc:sqlite:${dbFile.path}", "org.sqlite.JDBC")
     TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
     transaction  { SchemaUtils.create(Entries) }
 }
 
-class BlockSnapshot(block: Block){
-    val millis = currentMillis
-    val location = block.location
-    val data = block.state.data
-}
-
-fun Plugin.addEntry(snap: BlockSnapshot, _action: String)
+fun Plugin.addEntry(loc: Location)
     = transaction{
         val last = Entry.all().lastOrNull()?.id?.value
         Entry.new((last?:0)+1) {
-            millis = snap.millis
-            location = snap.location
-            action = _action
-            data = snap.data
+            millis = currentMillis
+            location = loc
         }
     }
-
-fun Plugin.addEntry(block: Block, _action: String) = addEntry(BlockSnapshot(block), _action)
 
 object Entries: IntIdTable(){
     val millis = long("millis")
@@ -49,8 +39,6 @@ object Entries: IntIdTable(){
     val x = integer("x")
     val y = integer("y")
     val z = integer("z")
-    val action = varchar("action",20)
-    val data = varchar("data",200)
 }
 
 class Entry(id: EntityID<Int>) : IntEntity(id) {
@@ -59,9 +47,7 @@ class Entry(id: EntityID<Int>) : IntEntity(id) {
     var x by Entries.x
     var y by Entries.y
     var z by Entries.z
-    var _data by Entries.data
     var millis by Entries.millis
-    var action by Entries.action
 }
 
 var Entry.world: World
@@ -76,11 +62,3 @@ var Entry.location
         y = value.blockY
         z = value.blockZ
     }
-
-var Entry.data: MaterialData
-    get(){
-        val (type, data) = _data.split(":")
-        val mat = Material.getMaterial(type)
-        return MaterialData(mat, data.toByte())
-    }
-    set(value){_data = "${value.itemType.name}:${value.data}" }

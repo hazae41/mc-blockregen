@@ -21,43 +21,24 @@ min-time: "2 days"
 # Minimum time after which a block is considered as "old" and will be regenerated
 # Can be [seconds, minutes, hours, days]
 
-max-blocks: "10"
-# Number of blocks restored at each regeneration
-# Can be of the format "X%" if you want it to be proportional to the total
-# Can be of the format "X" if you want it to be static (always the same amount)
+amount: 10
+# Percentage of blocks checked at each regeneration
+# Only X% of blocks will be checked, the rest will be checked at the next regen
+# "90" = some blocks won't be checked
+# "100" = all blocks will be checked
+# "50" = half the blocks will be checked
 
 efficiency: 90
-# Efficiency of the regeneration
+# Efficiency (percentage) of the regeneration
 # Only X% of blocks will be restored, the rest will be ignored
 # "90" = some blocks won't be restored
 # "100" = all blocks will be restored
 # "50" = half the blocks will be restored
 
-events:
-  broken:
-    enabled: true
-    # Restore broken blocks
-    ignore-creative: false
-    # Ignore blocks broken by players in creative gamemode
-  placed:
-    enabled: true
-    # Restore placed blocks?
-    ignore-creative: false
-    # Ignore blocks placed by players in creative gamemode
-  burnt:
-    enabled: true
-    # Restore burnt blocks
-  exploded:
-    enabled: true
-    # Restore explosions
-    type: whitelist
-    # Whitelist: only restore explosions caused by these entities
-    # Blacklist: do not restore explosions caused by these entities
-    list:
-      - creeper
-      - primed_tnt
+radius: 64
+# Radius (blocks) around players where blocks are restored
 
-controllers:
+filters:
   worlds:
     enabled: true
     type: whitelist
@@ -75,10 +56,4 @@ controllers:
     list:
       - bedrock
       - "minecraft:chest" # Explicit names are only available for 1.13
-
-extras:
-  force-log: true
-  # true: the plugin logs/saves the block in attempt to rollback it when it will match the filter
-  # false: the plugin simply ignores blocks that does not match the filter
-  # aka "If you want achieve rollback in now unclaimed areas"
 
