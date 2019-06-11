@@ -4,8 +4,8 @@ import hazae41.minecraft.kotlin.bukkit.*
 import hazae41.minecraft.kotlin.catch
 import hazae41.minecraft.kotlin.lowerCase
 import hazae41.minecraft.kotlin.toTimeWithUnit
-import jdk.nashorn.internal.objects.Global
-import kotlinx.coroutines.*
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import net.coreprotect.CoreProtectAPI
 import org.bukkit.Location
 import org.bukkit.block.Block
@@ -16,6 +16,7 @@ import kotlin.random.Random
 object Config: PluginConfigFile("config"){
     override var minDelay = 5000L
 
+    val debug by boolean("debug")
     var paused by boolean("paused")
 
     val alertBefore by string("alert.before")
@@ -75,26 +76,23 @@ fun Plugin.makeTimer(){
         delay = regenDelay,
         period = regenDelay,
         unit = TimeUnit.SECONDS,
-        callback = { alert(Config.alertBefore) }
+        callback = { if(!Config.paused) alert(Config.alertBefore) }
     )
 
     schedule(
         delay = regenDelay + alertDelay,
         period = regenDelay,
         unit = TimeUnit.SECONDS,
-        callback = { regen() }
+        callback = { if(!Config.paused) regen() }
     )
 }
 
 fun Plugin.regen() = GlobalScope.launch {
-    if(Config.paused) return@launch
 
     val api = CoreProtectAPI()
 
     val (minTimeValue, minTimeUnit) = Config.minTime.toTimeWithUnit()
     val minTime = TimeUnit.MILLISECONDS.convert(minTimeValue, minTimeUnit)
-
-    val ignored = transaction { Entry.all() }
 
     server.worlds.forEach { world ->
 
@@ -113,28 +111,29 @@ fun Plugin.regen() = GlobalScope.launch {
 
         if(lookup.isEmpty()) return@forEach
 
-        val results = lookup.map { api.parseResult(it) }
+        if(Config.debug) info("Database size: "+lookup.size)
 
-        var resultsByBlock = withContext(Dispatchers.Unconfined){
-            results.groupBy { world.getBlockAt(it.x, it.y, it.z) }
-        }
+        val ignored = transaction{ Entry.all().toList() }
+        val toIgnore = mutableListOf<Location>()
 
-        resultsByBlock = transaction {
-            resultsByBlock.filterKeys { block -> ignored.all { it.location != block.location } }
-        }
+        lookup
+            .asSequence()
+            .map { api.parseResult(it) }
+            .filter { !it.isRolledBack && it.time > minTime }
+            .map { Location(world, it.x.toDouble(), it.y.toDouble(), it.z.toDouble()) }
+            .distinct()
+            .filter { loc -> ignored.all { it.location != loc } }
+            .filter { it.chunk.isLoaded }
+            .apply { if(Config.debug) info("Real blocks: "+count()) }
+            .filter { Random.nextInt(100) <= Config.amount }
+            .apply { if(Config.debug) info("Checked blocks: "+count()) }
+            .filter { shouldRestore(it.block) }
+            .apply { if(Config.debug) info("Processed blocks: "+count()) }
+            .forEach { location ->
+                if(Random.nextInt(100) >= Config.efficiency)
+                    toIgnore += location
 
-        val newIgnored = mutableListOf<Location>()
-
-        resultsByBlock.forEach { block, bresults ->
-            if(Random.nextInt(100) >= Config.amount) return@forEach
-            if(!shouldRestore(block)) return@forEach
-            if(bresults.any { it.time < minTime}) return@forEach
-
-            if(Random.nextInt(100) >= Config.efficiency)
-                newIgnored += block.location
-
-            else schedule(async = true){
-                api.performRollback(
+                else api.performRollback(
                     Integer.MAX_VALUE,
                     null,
                     null,
@@ -142,12 +141,12 @@ fun Plugin.regen() = GlobalScope.launch {
                     null,
                     null,
                     1,
-                    block.location
+                    location
                 )
             }
-        }
 
-        transaction { newIgnored.forEach{ addEntry(it) } }
+        if(Config.debug) info("Ignored blocks: "+toIgnore.size)
+        toIgnore.forEach{ addEntry(it) }
     }
 
     alert(Config.alertAfter)
@@ -161,8 +160,13 @@ fun Plugin.makeCommands() = command("blockregen"){ args ->
         when(args.getOrNull(0)){
             "force", "f" -> {
                 checkPerm("force")
+                val start = currentMillis
                 msg("&bForcing block regeneration...")
-                regen()
+                regen().invokeOnCompletion {
+                    it?.message?.also(::msg)
+                    val time = currentMillis - start
+                    msg("&bRegeneration done! Took $time ms.")
+                }
             }
             "toggle", "t" -> {
                 checkPerm("toggle")

@@ -1,6 +1,5 @@
 paused: false
-# While this is true blocks will not be regenerated and any blocks broken during it
-# won't be restored by this plugin. But blocks broken before and after it will.
+# While this is true blocks will not be regenerated
 
 regen-delay: "30 minutes"
 # Delay between each regeneration
