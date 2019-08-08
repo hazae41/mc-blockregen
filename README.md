@@ -1,1 +1,1 @@
-### [Download](https://jitpack.io/com/github/PhaserArray/mc-blockregen/lands-SNAPSHOT/mc-blockregen-lands-SNAPSHOT-bundle.jar)
+### [Download](https://jitpack.io/com/github/hazae41/mc-blockregen/lands-SNAPSHOT/mc-blockregen-lands-SNAPSHOT-bundle.jar)
