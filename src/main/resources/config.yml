@@ -38,7 +38,7 @@ radius: 64
 # Radius (blocks) around players where blocks are restored
 
 safe-radius: 2
-# Radius (blocksà around players where blocks are NOT restored  in order to prevent suffocating/falling
+# Radius (blocks) around players where blocks are NOT restored  in order to prevent suffocating/falling
 
 filters:
   worlds:
