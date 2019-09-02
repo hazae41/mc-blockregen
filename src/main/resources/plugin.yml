@@ -6,7 +6,7 @@ author: hazae41
 commands:
   blockregen:
     aliases: [br, breg]
-    description: The Kotlinized BlockRegenerator!
+    description: hazae41's BlockRegen
     usage: "/<command>"
 
 permissions:

@@ -29,6 +29,7 @@ object Config: PluginConfigFile("config"){
     val amount by int("amount")
     val efficiency by int("efficiency")
     val radius by int("radius")
+    val safeRadius by int("safe-radius")
 
     object filters: ConfigSection(this, "filters"){
         object materials: ConfigSection(this, "materials"){
@@ -54,7 +55,7 @@ class Plugin: BukkitPlugin() {
         makeDatabase()
         makeTimer()
         makeCommands()
-        makeFilters()
+        makeDefaultFilters()
     }
 }
 
@@ -124,11 +125,9 @@ fun Plugin.regen() = GlobalScope.launch {
             .distinct()
             .filter { loc -> ignored.all { it.location != loc } }
             .filter { it.chunk.isLoaded }
-            .apply { if(Config.debug) info("Real blocks: "+count()) }
             .filter { Random.nextInt(100) <= Config.amount }
-            .apply { if(Config.debug) info("Checked blocks: "+count()) }
+            .filter { world.players.all { p -> p.location.distance(it) > Config.safeRadius } }
             .filter { shouldRestore(it.block) }
-            .apply { if(Config.debug) info("Processed blocks: "+count()) }
             .forEach { location ->
                 if(Random.nextInt(100) >= Config.efficiency)
                     toIgnore += location
@@ -197,7 +196,7 @@ fun Plugin.makeCommands() = command("blockregen"){ args ->
     }
 }
 
-fun Plugin.makeFilters() {
+fun makeDefaultFilters() {
 
     fun byMaterial(block: Block) = true.also {
         val config = Config.filters.materials
