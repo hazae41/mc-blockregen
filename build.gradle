@@ -1,9 +1,8 @@
 plugins {
     id 'org.jetbrains.kotlin.jvm' version '1.3.21'
-}
-
-plugins {
     id 'com.github.johnrengelman.shadow' version '4.0.2'
+    id "org.jlleitschuh.gradle.ktlint" version "8.2.0"
+    id "org.jlleitschuh.gradle.ktlint-idea" version "8.2.0"
 }
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation
@@ -13,7 +12,7 @@ task relocateShadowJar(type: ConfigureShadowRelocation) {
 }
 
 group 'hazae41'
-version '3.2.1'
+version '3.3'
 
 apply from: 'mcplugin.gradle'
 apply from: 'spigot.gradle'

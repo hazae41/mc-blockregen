@@ -2,10 +2,7 @@ package hazae41.minecraft.blockregen
 
 import org.bukkit.Bukkit
 import org.bukkit.Location
-import org.bukkit.Material
 import org.bukkit.World
-import org.bukkit.block.Block
-import org.bukkit.material.MaterialData
 import org.jetbrains.exposed.dao.EntityID
 import org.jetbrains.exposed.dao.IntEntity
 import org.jetbrains.exposed.dao.IntEntityClass
@@ -21,21 +18,21 @@ fun Plugin.makeDatabase() {
     val dbFile = File(dataFolder, "ignored.db")
     Database.connect("jdbc:sqlite:${dbFile.path}", "org.sqlite.JDBC")
     TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_SERIALIZABLE
-    transaction  { SchemaUtils.create(Entries) }
+    transaction { SchemaUtils.create(Entries) }
 }
 
-fun Plugin.addEntry(loc: Location)
-    = transaction{
+fun addEntry(loc: Location) =
+    transaction {
         val last = Entry.all().lastOrNull()?.id?.value
-        Entry.new((last?:0)+1) {
+        Entry.new((last ?: 0) + 1) {
             millis = currentMillis
             location = loc
         }
     }
 
-object Entries: IntIdTable(){
+object Entries : IntIdTable() {
     val millis = long("millis")
-    val world = varchar("world",20)
+    val world = varchar("world", 20)
     val x = integer("x")
     val y = integer("y")
     val z = integer("z")
@@ -52,11 +49,11 @@ class Entry(id: EntityID<Int>) : IntEntity(id) {
 
 var Entry.world: World
     get() = Bukkit.getWorld(_world)
-    set(value){ _world = value.name }
+    set(value) { _world = value.name }
 
 var Entry.location
     get() = Location(world, x.toDouble(), y.toDouble(), z.toDouble())
-    set(value){
+    set(value) {
         world = value.world
         x = value.blockX
         y = value.blockY
