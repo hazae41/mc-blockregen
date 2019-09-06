@@ -1,6 +1,6 @@
 package hazae41.minecraft.blockregen.lands
 
-import hazae41.minecraft.blockregen.controllers
+import hazae41.minecraft.blockregen.filters
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.PluginConfigFile
 import hazae41.minecraft.kotlin.bukkit.init
@@ -14,8 +14,8 @@ object Config: PluginConfigFile("config"){
     val list by stringList("list")
 }
 
-fun Plugin.addController() = also { plugin ->
-    controllers += fun(block: Block) = true.also{
+fun Plugin.addFilter() = also { plugin ->
+    filters += fun(block: Block) = true.also {
         if(!Config.enabled) return true
         val list = Config.list.map { it.lowerCase }
         LandsAddon(plugin, true).apply {
@@ -34,6 +34,6 @@ fun Plugin.addController() = also { plugin ->
 class Plugin: BukkitPlugin(){
     override fun onEnable() {
         init(Config)
-        addController()
+        addFilter()
     }
 }
