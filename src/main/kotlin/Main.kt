@@ -3,7 +3,7 @@ package hazae41.minecraft.blockregen.worldguard
 import com.sk89q.worldedit.bukkit.BukkitWorld
 import com.sk89q.worldedit.math.BlockVector3
 import com.sk89q.worldguard.WorldGuard
-import hazae41.minecraft.blockregen.controllers
+import hazae41.minecraft.blockregen.filters
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.PluginConfigFile
 import hazae41.minecraft.kotlin.bukkit.init
@@ -16,8 +16,8 @@ object Config: PluginConfigFile("config"){
     val list by stringList("list")
 }
 
-fun addController(){
-    controllers += fun(block: Block) = true.also{
+fun addFilter() {
+    filters += fun(block: Block) = true.also {
         if(!Config.enabled) return true
         val list = Config.list.map { it.lowerCase }
         val regions = WorldGuard.getInstance().platform.run {
@@ -35,6 +35,6 @@ fun addController(){
 class Plugin: BukkitPlugin(){
     override fun onEnable() {
         init(Config)
-        addController()
+        addFilter()
     }
 }
