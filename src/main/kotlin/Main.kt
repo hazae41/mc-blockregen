@@ -3,7 +3,7 @@ package hazae41.minecraft.blockregen.towny
 import com.palmergames.bukkit.towny.Towny
 import com.palmergames.bukkit.towny.`object`.TownBlock
 import com.palmergames.bukkit.towny.`object`.TownyWorld
-import hazae41.minecraft.blockregen.controllers
+import hazae41.minecraft.blockregen.filters
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.PluginConfigFile
 import hazae41.minecraft.kotlin.bukkit.init
@@ -16,9 +16,9 @@ object Config: PluginConfigFile("config"){
     val list by stringList("list")
 }
 
-fun addController(){
-    controllers += fun(block: Block) = true.also{
-        if(!Config.enabled) return true
+fun addFilter() {
+    filters += fun(block: Block) = true.also {
+        if (!Config.enabled) return true
         val list = Config.list.map { it.lowerCase }
         val tblock = TownBlock(block.x, block.z, TownyWorld(block.world.name))
         val towns = Towny.getPlugin().townyUniverse.townsMap.values
@@ -34,6 +34,6 @@ fun addController(){
 class Plugin: BukkitPlugin(){
     override fun onEnable() {
         init(Config)
-        addController()
+        addFilter()
     }
 }
