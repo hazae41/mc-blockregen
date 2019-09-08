@@ -20,7 +20,7 @@ fun Plugin.addFilter() = also { plugin ->
         val list = Config.list.map { it.lowerCase }
         LandsAddon(plugin, true).apply {
             val key = initialize()
-            val land = getLandChunk(block.chunk)?.land ?: return true
+            val land = getLandChunk(block.location)?.land ?: return true
             val name = land.name.lowerCase
             disable(key)
             when(Config.type){
