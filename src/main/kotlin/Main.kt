@@ -13,7 +13,7 @@ import net.md_5.bungee.api.ChatColor.stripColor
 import net.md_5.bungee.api.ChatColor.translateAlternateColorCodes
 import org.bukkit.block.Block
 
-object Config : PluginConfigFile("config") {
+object Config : ConfigSection(Filters, "factions") {
     val enabled by boolean("enabled")
     val type by string("type")
     val list by stringList("list")
@@ -34,7 +34,9 @@ fun addFilter() {
 
 class Plugin : BukkitPlugin() {
     override fun onEnable() {
-        init(Config)
         addFilter()
+        info("Added filter")
+        if (!dataFolder.exists()) return
+        severe("Please put your filter in BlockRegen config and remove ${dataFolder.name} folder")
     }
 }
