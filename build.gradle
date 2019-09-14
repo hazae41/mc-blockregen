@@ -15,7 +15,7 @@ task relocateShadowJar(type: ConfigureShadowRelocation) {
 
 
 group 'hazae41'
-version '3.3.1'
+version '3.4'
 
 apply from: 'mcplugin.gradle'
 apply from: 'spigot.gradle'
@@ -28,7 +28,7 @@ repositories {
 
 dependencies {
     compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
-    compileOnly 'com.github.hazae41:mc-blockregen:3.3.1'
+    compileOnly 'com.github.hazae41:mc-blockregen:3.4'
     compileOnly fileTree(dir: 'libs', include: ['*.jar'])
 }
 
