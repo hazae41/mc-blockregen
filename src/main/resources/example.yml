@@ -1,0 +1,86 @@
+# This file is just an example config and should NOT be modified
+# Tasks list
+tasks:
+  # Task name
+  main:
+    # If you want to pause the task
+    paused: false
+
+    # Delay between each regeneration
+    # Unit can be seconds, minutes, hours, days
+    regen-delay: 30 minutes
+
+    alert:
+      # Message displayed before the regeneration
+      # (leave empty to disable)
+      before: "&aRegeneration in 10 seconds..."
+      # It will be displayed X units before regen
+      # Unit can be seconds, minutes, hours, days
+      before-delay: 10 seconds
+      # Message displayed just after the regeneration
+      # (leave empty to disable)
+      after: "&aRegeneration done!"
+
+    # Minimum time after which a block is considered as "old" and will be regenerated
+    # Unit can be seconds, minutes, hours, days
+    min-time: 2 days
+
+    # PERCENTAGE of blocks checked at each regeneration
+    # Only X% of blocks will be checked, the rest will be checked at the next regen
+    # "90" = some blocks won't be checked
+    # "100" = all blocks will be checked
+    # "50" = half the blocks will be checked
+    amount: 10
+
+    # Efficiency (percentage) of the regeneration
+    # Only X% of blocks will be restored, the rest will be ignored
+    # "90" = some blocks won't be restored
+    # "100" = all blocks will be restored
+    # "50" = half the blocks will be restored
+    efficiency: 90
+
+    # Radius (blocks) around players where blocks are restored
+    radius: 64
+
+    # Radius (blocks) around players where blocks are NOT restored  in order to prevent suffocating/falling
+    safe-radius: 2
+
+    filters:
+      worlds:
+        # Enables this filter
+        enabled: true
+        # Whitelist: only restore worlds in the list
+        # Blacklist: do not restore worlds in the list
+        type: whitelist
+        # World names
+        list:
+          - world
+          - world_nether
+          - world_the_end
+      materials:
+        enabled: true
+        # Whitelist: only restore blocks whose material is in the list
+        # Blacklist: do not restore blocks whose material is in the list
+        type: blacklist
+        list:
+          - bedrock
+          - "minecraft:chest" # Explicit names are only available for 1.13
+      worldguard:
+        enabled: true
+        # Whitelist: only restore regions in the list
+        # Blacklist: do not restore regions in the list
+        type: whitelist
+        list:
+          - regen-area
+      factions:
+        enabled: true
+        # Whitelist: only restore factions in the list
+        # Blacklist: do not restore factions in the list
+        type: whitelist
+        list:
+          - wilderness
+      griefprevention:
+        enabled: true
+        restore-admin-claims: false
+        restore-player-claims: true
+      # civs, residence, towny, ... are like worldguard and factions

@@ -1,88 +1,30 @@
-# paused: false
-# # While this is true blocks will not be regenerated
-#
-# regen-delay: "30 minutes"
-# # Delay between each regeneration
-# # Unit can be [seconds, minutes, hours, days]
-#
-# alert:
-#   before: "&a[BlockRegenerator] Regeneration in 10 seconds..."
-#   # Message displayed before the regeneration
-#   # Leave empty to disable
-#   before-delay: "10 seconds"
-#   # It will be displayed X units before regen
-#   # Unit can be [seconds, minutes, hours, days]
-#   after: "&a[BlockRegenerator] Regeneration done!"
-#   # Message displayed just after the regeneration
-#   # Leave empty to disable
-#
-# min-time: "2 days"
-# # Minimum time after which a block is considered as "old" and will be regenerated
-# # Can be [seconds, minutes, hours, days]
-#
-# amount: 10
-# # Percentage of blocks checked at each regeneration
-# # Only X% of blocks will be checked, the rest will be checked at the next regen
-# # "90" = some blocks won't be checked
-# # "100" = all blocks will be checked
-# # "50" = half the blocks will be checked
-#
-# efficiency: 90
-# # Efficiency (percentage) of the regeneration
-# # Only X% of blocks will be restored, the rest will be ignored
-# # "90" = some blocks won't be restored
-# # "100" = all blocks will be restored
-# # "50" = half the blocks will be restored
-#
-# radius: 64
-# # Radius (blocks) around players where blocks are restored
-#
-# safe-radius: 2
-# # Radius (blocks) around players where blocks are NOT restored  in order to prevent suffocating/falling
-#
-# filters:
-#   worlds:
-#     enabled: true
-#     type: whitelist
-#     # Whitelist: only restore blocks in these worlds
-#     # Blacklist: do not restore blocks in these worlds
-#     list:
-#       - world
-#       - world_nether
-#       - world_the_end
-#   materials:
-#     enabled: true
-#     type: blacklist
-#     # Whitelist: only restore blocks materials in these materials
-#     # Blacklist: do not restore blocks materials in these materials
-#     list:
-#       - bedrock
-#       - "minecraft:chest" # Explicit names are only available for 1.13
-paused: false
-regen-delay: "30 minutes"
+tasks:
+  main:
+    paused: false
+    regen-delay: "30 minutes"
 
-alert:
-  before: "&a[BlockRegenerator] Regeneration in 10 seconds..."
-  before-delay: "10 seconds"
-  after: "&a[BlockRegenerator] Regeneration done!"
+    alert:
+      before: "&aRegeneration in 10 seconds..."
+      before-delay: "10 seconds"
+      after: "&aRegeneration done!"
 
-min-time: "2 days"
-amount: 10
-efficiency: 90
-radius: 64
-safe-radius: 2
+    min-time: "2 days"
+    amount: 10
+    efficiency: 90
+    radius: 64
+    safe-radius: 2
 
-filters:
-  worlds:
-    enabled: true
-    type: whitelist
-    list:
-      - world
-      - world_nether
-      - world_the_end
-  materials:
-    enabled: true
-    type: blacklist
-    list:
-      - bedrock
-      - "minecraft:chest"
+    filters:
+      worlds:
+        enabled: true
+        type: whitelist
+        list:
+          - world
+          - world_nether
+          - world_the_end
+      materials:
+        enabled: true
+        type: blacklist
+        list:
+          - bedrock
+          - "minecraft:chest"
