@@ -1,7 +1,7 @@
 package hazae41.minecraft.blockregen.worldguard
 
 import com.sk89q.worldguard.bukkit.WorldGuardPlugin
-import hazae41.minecraft.blockregen.Config.Filters
+import hazae41.minecraft.blockregen.Config.Tasks.Task
 import hazae41.minecraft.blockregen.filters
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.ConfigSection
@@ -24,7 +24,7 @@ fun addFilter() {
         val regions = WorldGuardPlugin.inst().run {
             regionContainer.get(block.world)!!.getApplicableRegions(block.location).map { it.id }
         }
-        when (Config.type) {
+        when (filter.type) {
             "whitelist" -> if (list.intersect(regions).isEmpty()) return false
             "blacklist" -> if (list.intersect(regions).any()) return false
         }
