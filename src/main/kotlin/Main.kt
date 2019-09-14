@@ -2,7 +2,7 @@ package hazae41.minecraft.blockregen.factions
 
 import com.massivecraft.factions.Board
 import com.massivecraft.factions.FLocation
-import hazae41.minecraft.blockregen.Config.Filters
+import hazae41.minecraft.blockregen.Config.Tasks.Task
 import hazae41.minecraft.blockregen.filters
 import hazae41.minecraft.kotlin.bukkit.BukkitPlugin
 import hazae41.minecraft.kotlin.bukkit.ConfigSection
@@ -13,19 +13,20 @@ import org.bukkit.ChatColor.stripColor
 import org.bukkit.ChatColor.translateAlternateColorCodes
 import org.bukkit.block.Block
 
-object Config : ConfigSection(Filters, "factions") {
+class Filter(task: Task) : ConfigSection(task.Filters(), "factions") {
     val enabled by boolean("enabled")
     val type by string("type")
     val list by stringList("list")
 }
 
 fun addFilter() {
-    filters += fun(block: Block) = true.also {
-        if(!Config.enabled) return true
-        val list = Config.list.map { it.lowerCase }
+    filters += fun Task.(block: Block) = true.also {
+        val filter = Filter(this)
+        if (!filter.enabled) return true
+        val list = filter.list.map { it.lowerCase }
         fun colorless(str: String) = stripColor(translateAlternateColorCodes('&', str))
         val faction = Board.getInstance().getFactionAt(FLocation(block)).tag.lowerCase.let(::colorless)
-        when(Config.type){
+        when(filter.type){
             "whitelist" -> if(faction !in list) return false
             "blacklist" -> if(faction in list) return false
         }
@@ -34,9 +35,9 @@ fun addFilter() {
 
 class Plugin : BukkitPlugin() {
     override fun onEnable() {
+        if (dataFolder.exists())
+            severe("Please put your filter in BlockRegen config and remove ${dataFolder.name} folder")
         addFilter()
         info("Added filter")
-        if (!dataFolder.exists()) return
-        severe("Please put your filter in BlockRegen config and remove ${dataFolder.name} folder")
     }
 }
